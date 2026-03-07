@@ -73,6 +73,9 @@ export default function UserDashboard() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState('create');
   const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [digiLockerDocs, setDigiLockerDocs] = useState<any[]>([]);
+  const [selectedDigiDoc, setSelectedDigiDoc] = useState<any>(null);
+  const [loadingDocs, setLoadingDocs] = useState(false);
   const [pdfPreview, setPdfPreview] = useState<string>('');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -103,6 +106,7 @@ export default function UserDashboard() {
         if (response.ok) {
           const data = await response.json();
           setUserData(data.user);
+        if (data.user?.aadhar) fetchDigiLockerDocs(data.user.aadhar);
         }
       } catch (error) {
         console.error('Failed to fetch user data:', error);
@@ -179,7 +183,7 @@ export default function UserDashboard() {
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (!pdfFile) newErrors.pdf = 'PDF document is required';
+    if (!selectedDigiDoc) newErrors.pdf = "Please select a document from DigiLocker";
     if (!userData?.firstName || !userData?.lastName) newErrors.fullName = 'Full name is required';
     if (!userData?.email) newErrors.email = 'Email is required';
     if (!userData?.phone) newErrors.phone = 'Phone number is required';
@@ -198,6 +202,22 @@ export default function UserDashboard() {
     return Object.keys(newErrors).length === 0;
   };
 
+  const fetchDigiLockerDocs = async (aadhar: string) => {
+    try {
+      setLoadingDocs(true);
+      const res = await fetch(`/api/digilocker-vault?aadhar=${aadhar}`);
+      const data = await res.json();
+      if (data.success) {
+        setDigiLockerDocs(data.data);
+        const landDeed = data.data.find((d: any) => d.documentType === "land_deed");
+        if (landDeed) setSelectedDigiDoc(landDeed);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingDocs(false);
+    }
+  };
   const uploadToIPFS = async (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -251,7 +271,8 @@ export default function UserDashboard() {
     try {
       console.log('Uploading PDF to IPFS...');
       setUploadProgress(30);
-      const ipfsHash = await uploadToIPFS(pdfFile!);
+      const ipfsHash = selectedDigiDoc?.ipfsHash;
+      if (!ipfsHash) throw new Error("No DigiLocker document selected");
       console.log('IPFS upload successful:', ipfsHash);
       setUploadProgress(60);
 
@@ -624,55 +645,53 @@ export default function UserDashboard() {
               <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xl shadow-slate-200/50">
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center border border-blue-100">
-                      <FiFileText className="text-lg text-blue-600" />
+                    <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center border border-purple-100">
+                      <FiFileText className="text-lg text-purple-600" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-bold text-slate-800">Document Upload</h3>
-                      <p className="text-xs text-slate-500">PDF format only</p>
+                      <h3 className="text-lg font-bold text-slate-800">🔐 DigiLocker Documents</h3>
+                      <p className="text-xs text-slate-500">Select your verified document</p>
                     </div>
                   </div>
                 </div>
 
                 <div className="space-y-4">
-                  {/* Upload/Remove Buttons */}
-                  <div className="flex flex-wrap gap-3">
-                    <label className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg cursor-pointer font-semibold transition-all duration-300 inline-flex items-center gap-2 shadow-md hover:shadow-lg hover:-translate-y-0.5">
-                      <FiUpload className="text-lg" />
-                      <span>Upload PDF</span>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept=".pdf"
-                        onChange={handlePdfSelect}
-                        hidden
-                      />
-                    </label>
-                    {pdfFile && (
-                      <button
-                        type="button"
-                        onClick={handleRemovePdf}
-                        className="px-6 py-2.5 bg-white border border-red-200 hover:bg-red-50 text-red-600 text-sm rounded-lg font-semibold transition-all duration-300 inline-flex items-center gap-2"
-                      >
-                        <FiTrash2 className="text-lg" />
-                        <span>Remove</span>
-                      </button>
-                    )}
-                  </div>
+                  {loadingDocs && (
+                    <div className="text-center py-4 text-purple-600 text-sm">Loading DigiLocker documents...</div>
+                  )}
 
-                  {/* File Info */}
-                  {pdfFile && (
-                    <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-                      <div className="flex items-start gap-3">
-                        <FiCheckCircle className="text-xl text-green-600 shrink-0 mt-0.5" />
+                  {!loadingDocs && digiLockerDocs.length === 0 && (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-center">
+                      <p className="text-sm text-yellow-800 font-medium">⚠️ No DigiLocker documents found</p>
+                      <p className="text-xs text-yellow-600 mt-1">Contact government authority to upload your documents</p>
+                      <a href="/digilocker" className="text-xs text-purple-600 underline mt-2 block">View DigiLocker →</a>
+                    </div>
+                  )}
+
+                  {digiLockerDocs.map((doc: any) => (
+                    <div
+                      key={doc._id}
+                      onClick={() => setSelectedDigiDoc(doc)}
+                      style={{cursor: 'pointer'}}
+                      className={`rounded-xl p-4 border-2 transition-all ${selectedDigiDoc?._id === doc._id ? 'border-purple-500 bg-purple-50' : 'border-slate-200 bg-white hover:border-purple-300'}`}
+                    >
+                      <div className="flex justify-between items-center">
                         <div>
-                          <p className="text-sm font-bold text-green-800">File Selected</p>
-                          <p className="text-xs text-green-700 mt-1 font-medium break-all">{pdfFile.name}</p>
-                          <p className="text-xs text-green-600 mt-0.5">{(pdfFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                          <p className="font-bold text-slate-800 text-sm">
+                            {doc.documentType === 'aadhaar_card' ? '🪪 Aadhaar Card' : '📜 Land Deed'}
+                          </p>
+                          <p className="text-xs text-slate-500 mt-1">{doc.fileName}</p>
+                          <p className="text-xs text-slate-400 mt-0.5 break-all">IPFS: {doc.ipfsHash?.slice(0,20)}...</p>
+                        </div>
+                        <div className="flex flex-col items-end gap-2">
+                          <span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full font-bold">✅ VERIFIED</span>
+                          {selectedDigiDoc?._id === doc._id && (
+                            <span className="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded-full font-bold">✓ Selected</span>
+                          )}
                         </div>
                       </div>
                     </div>
-                  )}
+                  ))}
 
                   {errors.pdf && (
                     <div className="bg-red-50 border border-red-200 rounded-xl p-4">
@@ -683,20 +702,21 @@ export default function UserDashboard() {
                     </div>
                   )}
 
-                  {/* PDF Viewer */}
-                  {pdfPreview ? (
-                    <div className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50 shadow-inner">
-                      <iframe
-                        src={pdfPreview}
-                        className="w-full h-96 md:h-[500px]"
-                      />
+                  {selectedDigiDoc && (
+                    <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
+                      <p className="text-sm font-bold text-purple-800">🔐 DigiLocker Document Selected</p>
+                      <p className="text-xs text-purple-600 mt-1">{selectedDigiDoc.fileName}</p>
+                      <p className="text-xs text-purple-500 mt-0.5 break-all">Hash: {selectedDigiDoc.ipfsHash}</p>
+                      <a href={`https://gateway.pinata.cloud/ipfs/${selectedDigiDoc.ipfsHash}`} target="_blank"
+                        className="text-xs text-blue-600 underline mt-1 block">View on IPFS →</a>
                     </div>
-                  ) : (
-                    <div className="border-2 border-dashed border-slate-300 rounded-xl h-64 md:h-[400px] flex items-center justify-center bg-slate-50">
+                  )}
+
+                  {!selectedDigiDoc && (
+                    <div className="border-2 border-dashed border-purple-200 rounded-xl h-32 flex items-center justify-center bg-purple-50">
                       <div className="text-center">
-                        <FiFileText className="text-5xl mb-3 text-slate-300 mx-auto" />
-                        <p className="text-slate-500 font-medium text-sm">Upload PDF to Preview</p>
-                        <p className="text-xs text-slate-400 mt-2 font-medium">Max 20MB</p>
+                        <p className="text-purple-400 font-medium text-sm">Select a document above</p>
+                        <p className="text-xs text-purple-300 mt-1">DigiLocker verified documents only</p>
                       </div>
                     </div>
                   )}
