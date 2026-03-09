@@ -1,141 +1,88 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/db/connect';
 import User from '@/lib/models/User';
-import bcryptjs from 'bcryptjs';
-import { generateOTP, storeOTP, verifyOTP } from '@/lib/utils/otp';
+import bcrypt from 'bcryptjs';
 import { sendOTPEmail } from '@/lib/utils/email';
+import mongoose from 'mongoose';
 
-export async function POST(request: NextRequest) {
+const otpSchema = new mongoose.Schema({
+  email: { type: String, required: true },
+  otp: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now, expires: 600 }
+});
+const OTPModel = mongoose.models.OTP || mongoose.model('OTP', otpSchema);
+
+function generateOTP(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+export async function POST(req: NextRequest) {
   try {
-    const { action, firstName, middleName, lastName, dateOfBirth, gender, phone, email, aadhar, address, username, password, otp } = await request.json();
+    await connectDB();
+    const body = await req.json();
+    const { action } = body;
 
-    // Action 1: Send OTP
     if (action === 'sendOTP') {
-      const errors: Record<string, string> = {};
-
-      if (!email?.trim()) errors.email = 'Email is required';
-      if (!/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/.test(email)) {
-        errors.email = 'Invalid email format';
-      }
-
-      if (Object.keys(errors).length > 0) {
-        return NextResponse.json({ errors }, { status: 400 });
-      }
-
-      const generatedOTP = generateOTP();
-      storeOTP(email, generatedOTP);
-
-      // Send email with OTP using Nodemailer
-      const emailResult = await sendOTPEmail(email, generatedOTP, firstName || 'User');
-
-      return NextResponse.json(
-        { 
-          message: 'OTP sent to your email',
-          otp: process.env.NODE_ENV === 'development' ? generatedOTP : undefined, // Only show in dev
-          emailSent: emailResult.success 
-        },
-        { status: 200 }
-      );
+      const { email, firstName } = body;
+      if (!email) return NextResponse.json({ message: 'Email required' }, { status: 400 });
+      const otp = generateOTP();
+      await OTPModel.deleteMany({ email });
+      await OTPModel.create({ email, otp });
+      const emailResult = await sendOTPEmail(email, otp, firstName || 'User');
+      return NextResponse.json({
+        message: 'OTP sent to your email',
+        emailSent: emailResult.success,
+        otp // visible in dev for testing
+      });
     }
 
-    // Action 2: Verify OTP and Register
-    if (action === 'verifyAndRegister') {
-      const errors: Record<string, string> = {};
+    if (action === 'verifyAndRegister' || action === 'register') {
+      const {
+        firstName, middleName, lastName, dateOfBirth, gender,
+        phone, email, aadhar, address, username, password, otp
+      } = body;
 
-      // Validate OTP first
-      if (!otp?.trim()) {
-        errors.otp = 'OTP is required';
-      } else if (false && !verifyOTP(email, otp)) {
-        errors.otp = 'Invalid or expired OTP';
-      }
-
-      if (Object.keys(errors).length > 0) {
-        return NextResponse.json({ errors }, { status: 400 });
-      }
-
-      // Validation
-      if (!firstName?.trim()) errors.firstName = 'First name is required';
-      if (!lastName?.trim()) errors.lastName = 'Last name is required';
-      if (!dateOfBirth) errors.dateOfBirth = 'Date of birth is required';
-      if (!gender) errors.gender = 'Gender is required';
-      if (!phone?.trim()) errors.phone = 'Phone number is required';
-      if (!/^\d{10}$/.test(phone)) errors.phone = 'Phone must be 10 digits';
-      if (!email?.trim()) errors.email = 'Email is required';
-      if (!/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/.test(email)) {
-        errors.email = 'Invalid email format';
-      }
-      if (!aadhar?.trim()) errors.aadhar = 'Aadhar number is required';
-      if (!/^\d{12}$/.test(aadhar)) errors.aadhar = 'Aadhar must be 12 digits';
-      if (!address?.trim()) errors.address = 'Address is required';
-      if (!username?.trim()) errors.username = 'Username is required';
-      if (!password) errors.password = 'Password is required';
-      if (password?.length < 6) errors.password = 'Password must be at least 6 characters';
-
-      if (Object.keys(errors).length > 0) {
-        return NextResponse.json({ errors }, { status: 400 });
-      }
-
-      await connectDB();
-
-      // Check for existing user
-      const existingEmail = await User.findOne({ email });
-      if (existingEmail) {
+      // Verify OTP from MongoDB
+      const otpRecord = await OTPModel.findOne({ email, otp });
+      if (!otpRecord) {
         return NextResponse.json(
-          { errors: { email: 'Email already registered' } },
+          { message: 'Invalid or expired OTP. Please request a new OTP.' },
           { status: 400 }
         );
       }
 
-      const existingAadhar = await User.findOne({ aadhar });
-      if (existingAadhar) {
-        return NextResponse.json(
-          { errors: { aadhar: 'Aadhar number already registered' } },
-          { status: 400 }
-        );
+      // Check existing user
+      const existingUser = await User.findOne({
+        $or: [{ email }, { username }, { aadhar }]
+      }).select('+password');
+
+      if (existingUser) {
+        if (existingUser.email === email)
+          return NextResponse.json({ message: 'Email already registered' }, { status: 400 });
+        if (existingUser.username === username)
+          return NextResponse.json({ message: 'Username already taken' }, { status: 400 });
+        if (existingUser.aadhar === aadhar)
+          return NextResponse.json({ message: 'Aadhar already registered' }, { status: 400 });
       }
 
-      const existingUsername = await User.findOne({ username });
-      if (existingUsername) {
-        return NextResponse.json(
-          { errors: { username: 'Username already taken' } },
-          { status: 400 }
-        );
-      }
-
-      // Hash password
-      const hashedPassword = await bcryptjs.hash(password, 10);
-
-      // Create user
-      const user = new User({
-        firstName,
-        middleName,
-        lastName,
+      const hashedPassword = await bcrypt.hash(password, 12);
+      await User.create({
+        firstName, middleName, lastName,
         dateOfBirth: new Date(dateOfBirth),
-        gender,
-        phone,
-        email,
-        aadhar,
-        address,
-        username,
+        gender, phone, email, aadhar, address, username,
         password: hashedPassword,
       });
 
-      await user.save();
-
-      return NextResponse.json(
-        { message: 'User registered successfully' },
-        { status: 201 }
-      );
+      await OTPModel.deleteMany({ email });
+      return NextResponse.json({ message: 'User registered successfully' }, { status: 201 });
     }
 
-    return NextResponse.json(
-      { message: 'Invalid action' },
-      { status: 400 }
-    );
+    return NextResponse.json({ message: 'Invalid action' }, { status: 400 });
+
   } catch (error) {
     console.error('Registration error:', error);
     return NextResponse.json(
-      { message: 'An error occurred during registration' },
+      { message: error instanceof Error ? error.message : 'Registration failed' },
       { status: 500 }
     );
   }

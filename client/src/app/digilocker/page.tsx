@@ -11,26 +11,48 @@ interface VaultDoc {
   citizenName: string;
 }
 
+interface PendingRequest {
+  _id: string;
+  applicationId: string;
+  requestedBy: string;
+  requestedByDesignation: string;
+  documentType: string;
+  status: string;
+  createdAt: string;
+}
+
 export default function CitizenDigiLocker() {
   const [docs, setDocs] = useState<VaultDoc[]>([]);
+  const [requests, setRequests] = useState<PendingRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
+  const [userEmail, setUserEmail] = useState('');
+  const [actionMsg, setActionMsg] = useState('');
 
-  useEffect(() => { fetchDocs(); }, []);
+  useEffect(() => { fetchAll(); }, []);
 
-  const fetchDocs = async () => {
+  const fetchAll = async () => {
     try {
       setLoading(true);
-      // Get current user profile to get aadhar
       const profileRes = await fetch('/api/users/profile');
       const profileData = await profileRes.json();
       if (!profileData.user?.aadhar) {
         setMessage('No Aadhaar number found in your profile');
         return;
       }
+      setUserEmail(profileData.user.email || '');
+
+      // Fetch vault docs
       const res = await fetch(`/api/digilocker-vault?aadhar=${profileData.user.aadhar}`);
       const data = await res.json();
       if (data.success) setDocs(data.data);
+
+      // Fetch pending requests by email
+      if (profileData.user.email) {
+        const reqRes = await fetch(`/api/digilocker/request?citizenEmail=${profileData.user.email}`);
+        const reqData = await reqRes.json();
+        if (reqData.requests) setRequests(reqData.requests.filter((r: PendingRequest) => r.status === 'pending'));
+      }
     } catch (err) {
       setMessage('Failed to load documents');
     } finally {
@@ -38,7 +60,24 @@ export default function CitizenDigiLocker() {
     }
   };
 
+  const handleRespond = async (requestId: string, action: 'approved' | 'rejected') => {
+    try {
+      const res = await fetch('/api/digilocker/respond', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, action })
+      });
+      const data = await res.json();
+      setActionMsg(action === 'approved' ? '✅ Access granted to official!' : '❌ Request rejected.');
+      setTimeout(() => setActionMsg(''), 3000);
+      fetchAll();
+    } catch {
+      setActionMsg('Failed to respond');
+    }
+  };
+
   const docLabel = (type: string) => type === 'aadhaar_card' ? '🪪 Aadhaar Card' : '📜 Land Deed';
+  const designationLabel = (d: string) => d.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
   return (
     <div style={{ minHeight: '100vh', background: '#0f172a', color: '#e2e8f0', fontFamily: 'Arial, sans-serif' }}>
@@ -53,11 +92,56 @@ export default function CitizenDigiLocker() {
       </div>
 
       <div style={{ maxWidth: '800px', margin: '0 auto', padding: '24px' }}>
+
+        {/* Pending Requests Section */}
+        {requests.length > 0 && (
+          <div style={{ marginBottom: '24px' }}>
+            <h2 style={{ color: '#f59e0b', fontSize: '16px', marginBottom: '12px' }}>🔔 Pending Document Requests ({requests.length})</h2>
+            {requests.map((req) => (
+              <div key={req._id} style={{ background: '#1e293b', border: '1px solid #f59e0b44', borderRadius: '12px', padding: '16px', marginBottom: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                  <div>
+                    <div style={{ fontWeight: 'bold', color: '#fbbf24', marginBottom: '4px' }}>
+                      🏛️ {designationLabel(req.requestedByDesignation)} is requesting access
+                    </div>
+                    <div style={{ fontSize: '13px', color: '#94a3b8' }}>
+                      Document: <span style={{ color: '#e2e8f0' }}>{docLabel(req.documentType)}</span>
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+                      Application: {req.applicationId} · {new Date(req.createdAt).toLocaleDateString('en-IN')}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      onClick={() => handleRespond(req._id, 'approved')}
+                      style={{ background: '#16a34a', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }}
+                    >
+                      ✅ Approve
+                    </button>
+                    <button
+                      onClick={() => handleRespond(req._id, 'rejected')}
+                      style={{ background: '#dc2626', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }}
+                    >
+                      ❌ Reject
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {actionMsg && (
+          <div style={{ background: '#1e293b', border: '1px solid #22c55e', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', textAlign: 'center', color: '#22c55e' }}>
+            {actionMsg}
+          </div>
+        )}
+
         {/* Info Box */}
         <div style={{ background: '#1e3a8a22', border: '1px solid #1e40af', borderRadius: '12px', padding: '16px', marginBottom: '24px' }}>
           <div style={{ fontWeight: 'bold', color: '#38bdf8', marginBottom: '6px' }}>ℹ️ About DigiLocker</div>
           <div style={{ fontSize: '13px', color: '#94a3b8' }}>
-            These documents have been verified and uploaded by the Government Authority. 
+            These documents have been verified and uploaded by the Government Authority.
             They are stored on IPFS (decentralized storage) and cannot be tampered with.
             Use these documents when applying for land registration.
           </div>

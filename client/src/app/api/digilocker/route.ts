@@ -8,7 +8,7 @@ import { getSession } from '@/lib/utils/session';
 export async function GET(req: NextRequest) {
   try {
     await connectDB();
-    const cookieName = getSessionCookieName('user');
+    const cookieName = getSessionCookieName();
     const sessionToken = req.cookies.get(cookieName)?.value;
     if (!sessionToken) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const requests = await DigiLockerRequest.find({
-      citizenUsername: session.username
+      citizenUsername: session.userId
     }).sort({ requestedAt: -1 });
     return NextResponse.json({ success: true, data: requests });
   } catch (error) {

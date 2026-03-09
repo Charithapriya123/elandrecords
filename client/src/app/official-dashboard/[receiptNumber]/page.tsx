@@ -15,6 +15,7 @@ import SurveyorFields, { type SurveyorFieldsHandle } from '@/components/roleFiel
 import MROFields, { type MROFieldsHandle } from '@/components/roleFields/MROFields';
 import ClerkFields, { type ClerkFieldsHandle } from '@/components/roleFields/ClerkFields';
 import ApplicationHistory from '@/components/ApplicationHistory';
+import DigiLockerRequestPanel from '@/components/DigiLockerRequestPanel';
 
 interface Official {
   _id?: string;
@@ -42,6 +43,7 @@ interface Application {
   pincode?: string;
   nature?: string;
   ipfsHash?: string;
+  aadharNumber?: string;
   currentlyWith?: string;
   currentStage?: string;
   actionHistory?: Array<{
@@ -489,6 +491,16 @@ export default function ApplicationDetailsPage() {
                   </a>
                 </div>
               </div>
+            )}
+            {/* DigiLocker Document Request */}
+            {official?._id && (
+              <DigiLockerRequestPanel
+                aadharNumber={application.aadharNumber || ''}
+                receiptNumber={application.receiptNumber}
+                officialId={official._id || ''}
+                officialName={`${official.firstName} ${official.lastName}`}
+                designation={official.designation || ''}
+              />
             )}
           </div>
         </div>
