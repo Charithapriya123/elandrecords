@@ -111,12 +111,47 @@ class FabricClient {
             }
 
             console.log(`Submitting transaction: ${functionName} by ${username}`, args);
-            const result = await contract.submitTransaction(functionName, ...args);
-            console.log(`Transaction ${functionName} submitted successfully`);
+            const transaction = contract.createTransaction(functionName);
+            const txId = transaction.getTransactionId();
+            const result = await transaction.submit(...args);
 
-            return result.toString();
+            console.log(`Transaction ${functionName} submitted with ID: ${txId}`);
+
+            return {
+                result: result.toString(),
+                txId: txId
+            };
         } catch (error) {
             console.error(`Failed to submit transaction ${functionName}:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Submit a transaction to the blockchain using Transient Data
+     */
+    async submitTransactionWithTransient(username, functionName, transientData, ...args) {
+        try {
+            const contract = this.contracts.get(username);
+            if (!contract) {
+                throw new Error(`No active connection for user: ${username}`);
+            }
+
+            console.log(`Submitting transient transaction: ${functionName} by ${username}`, args);
+            const transaction = contract.createTransaction(functionName);
+            const txId = transaction.getTransactionId();
+            transaction.setTransient(transientData);
+
+            const result = await transaction.submit(...args);
+
+            console.log(`Transient Transaction submitted with ID: ${txId}`);
+
+            return {
+                result: result.toString(),
+                txId: txId
+            };
+        } catch (error) {
+            console.error(`Failed to submit transient transaction ${functionName}:`, error);
             throw error;
         }
     }
@@ -170,40 +205,65 @@ class FabricClient {
      * Create new application
      */
     async createApplication(username, applicationId, userData) {
-        const result = await this.submitTransaction(username, 'createApplication', applicationId, JSON.stringify(userData));
-        return JSON.parse(result);
+        const transientData = {
+            "userData": Buffer.from(JSON.stringify(userData))
+        };
+        const response = await this.submitTransactionWithTransient(username, 'createApplication', transientData, applicationId);
+        return {
+            result: response.result,
+            txId: response.txId
+        };
     }
 
     /**
      * Verify application by revenue department
      */
     async verifyByRevenue(username, applicationId, officerData) {
-        const result = await this.submitTransaction(username, 'verifyByRevenue', applicationId, JSON.stringify(officerData));
-        return JSON.parse(result);
+        const response = await this.submitTransaction(username, 'verifyByRevenue', applicationId, JSON.stringify(officerData));
+        return {
+            result: response.result,
+            txId: response.txId
+        };
     }
 
     /**
      * Update survey report
      */
     async surveyReportUpdate(username, applicationId, surveyData) {
-        const result = await this.submitTransaction(username, 'surveyReportUpdate', applicationId, JSON.stringify(surveyData));
-        return JSON.parse(result);
+        const response = await this.submitTransaction(username, 'surveyReportUpdate', applicationId, JSON.stringify(surveyData));
+        return {
+            result: response.result,
+            txId: response.txId
+        };
     }
 
     /**
      * Forward application to next stage
      */
     async forwardApplication(username, applicationId, forwardData) {
-        const result = await this.submitTransaction(username, 'forwardApplication', applicationId, JSON.stringify(forwardData));
-        return JSON.parse(result);
+        const response = await this.submitTransaction(username, 'forwardApplication', applicationId, JSON.stringify(forwardData));
+        return {
+            result: response.result,
+            txId: response.txId
+        };
     }
 
     /**
      * Approve application by collector
      */
     async approveByCollector(username, applicationId, approvalData) {
-        const result = await this.submitTransaction(username, 'approveByCollector', applicationId, JSON.stringify(approvalData));
-        return JSON.parse(result);
+        const response = await this.submitTransaction(username, 'approveByCollector', applicationId, JSON.stringify(approvalData));
+        return {
+            result: response.result,
+            txId: response.txId
+        };
+    }
+    /**
+     * Record document integrity hash on blockchain
+     */
+    async recordDocumentIntegrity(username, docHash, ipfsHash, aadharNumber, requestId, officialId) {
+        const result = await this.submitTransaction(username, 'recordDocumentIntegrity', docHash, ipfsHash, aadharNumber, requestId, officialId);
+        return result; // return result object {result, txId}
     }
 }
 

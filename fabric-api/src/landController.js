@@ -69,17 +69,23 @@ router.post('/applications', async (req, res) => {
     await fabricClient.connect('admin-registration');
 
     // Use admin user for creating applications
-    const result = await fabricClient.createApplication('admin-registration', applicationId, userData);
+    const response = await fabricClient.createApplication('admin-registration', applicationId, userData);
+    const result = JSON.parse(response.result);
 
     res.json({
       success: true,
       data: result,
+      txId: response.txId,
       message: 'Application created successfully'
     });
 
   } catch (error) {
     console.error('Create application error:', error);
-    res.status(500).json({ error: error.message || 'Failed to create application' });
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to create application',
+      details: error.stack
+    });
   }
 });
 
@@ -101,11 +107,13 @@ router.post('/applications/:id/verify', async (req, res) => {
     await fabricClient.connect(username);
 
     // Perform verification
-    const result = await fabricClient.verifyByRevenue(username, id, officerData);
+    const response = await fabricClient.verifyByRevenue(username, id, officerData);
+    const result = JSON.parse(response.result);
 
     res.json({
       success: true,
       data: result,
+      txId: response.txId,
       message: 'Application verified successfully'
     });
 
@@ -133,11 +141,13 @@ router.post('/applications/:id/survey', async (req, res) => {
     await fabricClient.connect(username);
 
     // Perform survey update
-    const result = await fabricClient.surveyReportUpdate(username, id, surveyData);
+    const response = await fabricClient.surveyReportUpdate(username, id, surveyData);
+    const result = JSON.parse(response.result);
 
     res.json({
       success: true,
       data: result,
+      txId: response.txId,
       message: 'Survey report updated successfully'
     });
 
@@ -165,11 +175,13 @@ router.post('/applications/:id/forward', async (req, res) => {
     await fabricClient.connect(username);
 
     // Perform forward
-    const result = await fabricClient.forwardApplication(username, id, forwardData);
+    const response = await fabricClient.forwardApplication(username, id, forwardData);
+    const result = JSON.parse(response.result);
 
     res.json({
       success: true,
       data: result,
+      txId: response.txId,
       message: 'Application forwarded successfully'
     });
 
@@ -197,17 +209,48 @@ router.post('/applications/:id/approve', async (req, res) => {
     await fabricClient.connect(username);
 
     // Perform approval
-    const result = await fabricClient.approveByCollector(username, id, approvalData);
+    const response = await fabricClient.approveByCollector(username, id, approvalData);
+    const result = JSON.parse(response.result);
 
     res.json({
       success: true,
       data: result,
+      txId: response.txId,
       message: 'Application approved successfully'
     });
 
   } catch (error) {
     console.error('Approve application error:', error);
     res.status(500).json({ error: error.message || 'Failed to approve application' });
+  }
+});
+
+// Record DigiLocker document integrity
+router.post('/digilocker/record', async (req, res) => {
+  try {
+    const { docHash, ipfsHash, aadharNumber, requestId, officialId } = req.body;
+
+    if (!docHash || !ipfsHash || !aadharNumber || !requestId || !officialId) {
+      return res.status(400).json({ error: 'Missing required fields for integrity record' });
+    }
+
+    const username = 'admin-registration'; // Default to admin for recording
+
+    // Connect to fabric network
+    await fabricClient.connect(username);
+
+    // Perform recording
+    const result = await fabricClient.recordDocumentIntegrity(username, docHash, ipfsHash, aadharNumber, requestId, officialId);
+
+    res.json({
+      success: true,
+      data: result,
+      message: 'Document integrity recorded successfully'
+    });
+
+  } catch (error) {
+    console.error('Record integrity error:', error);
+    res.status(500).json({ error: error.message || 'Failed to record document integrity' });
   }
 });
 

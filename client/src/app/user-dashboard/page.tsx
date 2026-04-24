@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import DIDDisplay from '@/components/DIDDisplay';
 import { useRouter } from 'next/navigation';
 import {
   FiUpload,
@@ -37,6 +38,7 @@ import { IoRocketSharp } from 'react-icons/io5';
 interface UserData {
   id: string;
   firstName: string;
+  did?: string;
   middleName?: string;
   lastName: string;
   email: string;
@@ -68,6 +70,16 @@ interface LandRequest {
   certificateNumber?: string;
 }
 
+interface NotificationItem {
+  _id: string;
+  historyId: string;
+  receiptNumber: string;
+  action: string;
+  remarks?: string;
+  fromDesignation?: string;
+  timestamp: string;
+}
+
 export default function UserDashboard() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -83,6 +95,8 @@ export default function UserDashboard() {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [requests, setRequests] = useState<LandRequest[]>([]);
   const [loadingRequests, setLoadingRequests] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
 
   const [formData, setFormData] = useState({
     ownerName: '',
@@ -106,7 +120,7 @@ export default function UserDashboard() {
         if (response.ok) {
           const data = await response.json();
           setUserData(data.user);
-        if (data.user?.aadhar) fetchDigiLockerDocs(data.user.aadhar);
+          if (data.user?.aadhar) fetchDigiLockerDocs(data.user.aadhar);
         }
       } catch (error) {
         console.error('Failed to fetch user data:', error);
@@ -140,6 +154,34 @@ export default function UserDashboard() {
   useEffect(() => {
     if (activeTab === 'status' && userData) {
       fetchRequests();
+    }
+  }, [activeTab, userData]);
+
+  const fetchNotifications = async () => {
+    if (!userData) return;
+    setLoadingNotifications(true);
+    try {
+      const response = await fetch(
+        `/api/user/notifications?email=${userData.email}`,
+        {
+          credentials: 'include',
+          cache: 'no-store',
+        }
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setNotifications(data.notifications || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch notifications:', error);
+    } finally {
+      setLoadingNotifications(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'inbox' && userData) {
+      fetchNotifications();
     }
   }, [activeTab, userData]);
 
@@ -271,9 +313,9 @@ export default function UserDashboard() {
     try {
       console.log('Uploading PDF to IPFS...');
       setUploadProgress(30);
-      const ipfsHash = selectedDigiDoc?.ipfsHash;
-      if (!ipfsHash) throw new Error("No DigiLocker document selected");
-      console.log('IPFS upload successful:', ipfsHash);
+      const ipfsHash = selectedDigiDoc?.ipfsHash || selectedDigiDoc?._id;
+      if (!selectedDigiDoc) throw new Error("No DigiLocker document selected");
+      console.log('DigiLocker document selected:', selectedDigiDoc.fileName);
       setUploadProgress(60);
 
       console.log('Creating land request...', { formData, userData });
@@ -376,11 +418,11 @@ export default function UserDashboard() {
               cache: 'no-store',
             }
           );
-          
+
           if (freshResponse.ok) {
             const freshData = await freshResponse.json();
             const updatedRequest = freshData.requests?.find((r: any) => r.receiptNumber === receiptNumber);
-            
+
             if (updatedRequest?.pattaHash) {
               const documentUrl = `/api/documents/view?hash=${updatedRequest.pattaHash}`;
               window.open(documentUrl, '_blank');
@@ -417,11 +459,11 @@ export default function UserDashboard() {
               cache: 'no-store',
             }
           );
-          
+
           if (freshResponse.ok) {
             const freshData = await freshResponse.json();
             const updatedRequest = freshData.requests?.find((r: any) => r.receiptNumber === receiptNumber);
-            
+
             if (updatedRequest?.pattaHash) {
               const documentUrl = `/api/documents/view?hash=${updatedRequest.pattaHash}`;
               window.open(documentUrl, '_blank');
@@ -436,8 +478,8 @@ export default function UserDashboard() {
       }
     }
 
-    // Fallback: Generate form view
-    window.open(`/api/land-requests/generate-form?receipt=${receiptNumber}`, '_blank');
+    // Fallback: Generate PDF view
+    window.open(`/api/land-requests/generate-pdf?receipt=${receiptNumber}`, '_blank');
   };
 
   const handleDownloadPatta = async (receiptNumber: string) => {
@@ -478,11 +520,11 @@ export default function UserDashboard() {
               cache: 'no-store',
             }
           );
-          
+
           if (freshResponse.ok) {
             const freshData = await freshResponse.json();
             const updatedRequest = freshData.requests?.find((r: any) => r.receiptNumber === receiptNumber);
-            
+
             if (updatedRequest?.pattaHash) {
               const documentUrl = `/api/documents/view?hash=${updatedRequest.pattaHash}&print=true`;
               window.open(documentUrl, '_blank');
@@ -519,11 +561,11 @@ export default function UserDashboard() {
               cache: 'no-store',
             }
           );
-          
+
           if (freshResponse.ok) {
             const freshData = await freshResponse.json();
             const updatedRequest = freshData.requests?.find((r: any) => r.receiptNumber === receiptNumber);
-            
+
             if (updatedRequest?.pattaHash) {
               const documentUrl = `/api/documents/view?hash=${updatedRequest.pattaHash}&print=true`;
               window.open(documentUrl, '_blank');
@@ -538,28 +580,21 @@ export default function UserDashboard() {
       }
     }
 
-    // Fallback: Generate form
-    const response = await fetch(`/api/land-requests/generate-form?receipt=${receiptNumber}`);
-    const html = await response.text();
-
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = window.URL.createObjectURL(blob);
-
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Patta-${receiptNumber}.html`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    // Fallback: Generate PDF download
+    window.open(`/api/land-requests/generate-pdf?receipt=${receiptNumber}`, '_blank');
   };
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800">
       <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-800">Dashboard</h1>
-          <p className="text-slate-500">Welcome back, {userData?.firstName || 'User'}</p>
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-800">Dashboard</h1>
+            <p className="text-slate-500">Welcome back, {userData?.firstName || 'User'}</p>
+          </div>
+          <a href="/digilocker" className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold text-sm transition-all shadow-md">
+            🔐 My DigiLocker
+          </a>
         </div>
 
         {/* Tab Navigation Cards */}
@@ -672,7 +707,7 @@ export default function UserDashboard() {
                     <div
                       key={doc._id}
                       onClick={() => setSelectedDigiDoc(doc)}
-                      style={{cursor: 'pointer'}}
+                      style={{ cursor: 'pointer' }}
                       className={`rounded-xl p-4 border-2 transition-all ${selectedDigiDoc?._id === doc._id ? 'border-purple-500 bg-purple-50' : 'border-slate-200 bg-white hover:border-purple-300'}`}
                     >
                       <div className="flex justify-between items-center">
@@ -681,7 +716,7 @@ export default function UserDashboard() {
                             {doc.documentType === 'aadhaar_card' ? '🪪 Aadhaar Card' : '📜 Land Deed'}
                           </p>
                           <p className="text-xs text-slate-500 mt-1">{doc.fileName}</p>
-                          <p className="text-xs text-slate-400 mt-0.5 break-all">IPFS: {doc.ipfsHash?.slice(0,20)}...</p>
+                          <p className="text-xs text-slate-400 mt-0.5 break-all">{doc.ipfsHash ? 'IPFS: ' + doc.ipfsHash.slice(0, 20) + '...' : '📁 Stored in vault'}</p>
                         </div>
                         <div className="flex flex-col items-end gap-2">
                           <span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full font-bold">✅ VERIFIED</span>
@@ -706,9 +741,7 @@ export default function UserDashboard() {
                     <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
                       <p className="text-sm font-bold text-purple-800">🔐 DigiLocker Document Selected</p>
                       <p className="text-xs text-purple-600 mt-1">{selectedDigiDoc.fileName}</p>
-                      <p className="text-xs text-purple-500 mt-0.5 break-all">Hash: {selectedDigiDoc.ipfsHash}</p>
-                      <a href={`https://gateway.pinata.cloud/ipfs/${selectedDigiDoc.ipfsHash}`} target="_blank"
-                        className="text-xs text-blue-600 underline mt-1 block">View on IPFS →</a>
+                      <p className="text-xs text-purple-500 mt-0.5 break-all">{selectedDigiDoc.ipfsHash ? 'Hash: ' + selectedDigiDoc.ipfsHash : 'Document ready - IPFS on approval'}</p>
                     </div>
                   )}
 
@@ -1083,13 +1116,75 @@ export default function UserDashboard() {
 
         {/* Inbox Tab */}
         {activeTab === 'inbox' && (
-          <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200 p-16 text-center">
-            <div className="w-20 h-20 bg-purple-50 rounded-full flex items-center justify-center mx-auto mb-6 border border-purple-100">
-              <FiInbox className="text-4xl text-purple-500" />
+          <div>
+            <div className="mb-8 pb-6 border-b border-purple-100">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4 mb-3">
+                  <div className="w-12 h-12 bg-purple-50 rounded-xl flex items-center justify-center border border-purple-100">
+                    <FiInbox className="text-2xl text-purple-600" />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-bold text-slate-800">Inbox</h1>
+                    <p className="text-slate-500 text-sm mt-0.5">Notifications and messages</p>
+                  </div>
+                </div>
+                <button
+                  onClick={fetchNotifications}
+                  disabled={loadingNotifications}
+                  className="px-5 py-2.5 bg-white border border-purple-200 hover:border-purple-300 hover:bg-purple-50 text-purple-700 rounded-lg font-bold flex items-center gap-2 transition-all duration-200 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed md:text-sm"
+                >
+                  <FiRefreshCw className={loadingNotifications ? 'animate-spin' : ''} />
+                  Refresh
+                </button>
+              </div>
             </div>
-            <h2 className="text-xl font-bold text-slate-800 mb-2">Inbox</h2>
-            <p className="text-slate-500">Notifications and messages will appear here.</p>
-            <p className="text-xs text-slate-400 mt-2 font-medium uppercase tracking-wider">Coming Soon</p>
+
+            {loadingNotifications ? (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-xl shadow-slate-200/50 p-16 text-center">
+                <FiLoader className="text-4xl text-purple-500 animate-spin mx-auto mb-4" />
+                <p className="text-lg text-slate-700 font-bold mb-1">Loading Notifications</p>
+                <p className="text-slate-400 text-sm">Please wait while we fetch your messages...</p>
+              </div>
+            ) : notifications.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-xl shadow-slate-200/50 p-16 text-center">
+                <div className="w-20 h-20 bg-purple-50 rounded-full flex items-center justify-center mx-auto mb-6 border border-purple-100">
+                  <FiInbox className="text-4xl text-purple-400" />
+                </div>
+                <p className="text-xl text-slate-800 font-bold mb-2">No Messages Yet</p>
+                <p className="text-slate-500 text-sm max-w-md mx-auto mb-8">You have no new notifications.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {notifications.map((notif) => (
+                  <div key={notif._id} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-all">
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="flex items-center gap-2">
+                        {notif.action === 'approved' && <span className="p-2 bg-green-100 text-green-700 rounded-full"><FiCheckCircle /></span>}
+                        {notif.action === 'rejected' && <span className="p-2 bg-red-100 text-red-700 rounded-full"><FiAlertCircle /></span>}
+                        {notif.action !== 'approved' && notif.action !== 'rejected' && <span className="p-2 bg-blue-100 text-blue-700 rounded-full"><FiInfo /></span>}
+                        <div>
+                          <p className="font-bold text-slate-800 text-lg capitalize">
+                            Request <span className="font-mono text-base bg-slate-100 px-1 rounded">{notif.receiptNumber}</span> was {notif.action.replace('_', ' ')}
+                          </p>
+                          <p className="text-sm text-slate-500">By {notif.fromDesignation || 'System'}</p>
+                        </div>
+                      </div>
+                      <span className="text-xs text-slate-400 font-medium bg-slate-50 px-2 py-1 rounded border border-slate-100">
+                        {new Date(notif.timestamp).toLocaleString(undefined, {
+                          year: 'numeric', month: 'short', day: 'numeric',
+                          hour: '2-digit', minute: '2-digit'
+                        })}
+                      </span>
+                    </div>
+                    {notif.remarks && (
+                      <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-100">
+                        <p className="text-sm text-slate-700"><span className="font-bold text-slate-900">Remarks:</span> {notif.remarks}</p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -1111,6 +1206,12 @@ export default function UserDashboard() {
                     </div>
                   </div>
                 </div>
+                {/* DID Display */}
+                {userData.did && (
+                  <div className="mb-6">
+                    <DIDDisplay did={userData.did} />
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="p-5 rounded-xl border border-slate-200 hover:border-orange-200 bg-slate-50 hover:bg-orange-50/30 transition-colors group">

@@ -30,6 +30,7 @@ export async function GET(req: NextRequest) {
         phone: user.phone,
         aadhar: user.aadhar,
         dateOfBirth: user.dateOfBirth?.toISOString().split('T')[0], // Format as YYYY-MM-DD
+        did: user.did || '',
       },
     });
   } catch (error) {

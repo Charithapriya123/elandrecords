@@ -19,7 +19,6 @@ export async function POST(req: NextRequest) {
 
     const existing = await DigiLockerRequest.findOne({
       applicationId: receiptNumber,
-      requestedBy: officialId,
       status: { $in: ['pending', 'approved'] }
     });
     if (existing) {
@@ -30,10 +29,10 @@ export async function POST(req: NextRequest) {
       applicationId: receiptNumber,
       requestedBy: officialId,
       requestedByDesignation: designation,
-      citizenUsername: vault.citizenName,
+      citizenUsername: vault.citizenName || vault.citizenEmail || 'citizen',
       citizenEmail: vault.citizenEmail,
       documentType: documentType || 'land_deed',
-      ipfsHash: vault.ipfsHash,
+      ipfsHash: vault.ipfsHash || '',
       status: 'pending'
     });
 
@@ -49,12 +48,10 @@ export async function GET(req: NextRequest) {
     await connectDB();
     const { searchParams } = new URL(req.url);
     const receiptNumber = searchParams.get('receiptNumber');
-    const officialId = searchParams.get('officialId');
     const citizenEmail = searchParams.get('citizenEmail');
 
     const query: any = {};
     if (receiptNumber) query.applicationId = receiptNumber;
-    if (officialId) query.requestedBy = officialId;
     if (citizenEmail) query.citizenEmail = citizenEmail;
 
     const requests = await DigiLockerRequest.find(query).sort({ createdAt: -1 });

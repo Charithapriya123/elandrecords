@@ -2,7 +2,7 @@
 
 import { useState, FormEvent } from 'react';
 import Link from 'next/link';
-import { DESIGNATIONS, DESIGNATION_LABELS } from '@/lib/models/Official';
+import { DESIGNATIONS, DESIGNATION_LABELS } from '@/lib/constants';
 import { FaShieldAlt, FaUser, FaLock, FaMap, FaLandmark, FaMapPin, FaFileAlt, FaArrowRight, FaBriefcase } from 'react-icons/fa';
 
 export default function OfficialLogin() {
@@ -169,11 +169,10 @@ export default function OfficialLogin() {
                     value={formData.username}
                     onChange={handleChange}
                     placeholder="Enter your username"
-                    className={`w-full px-4 py-3 rounded-lg bg-white/10 border transition focus:outline-none focus:ring-2 text-white placeholder-gray-400 ${
-                      errors.username
+                    className={`w-full px-4 py-3 rounded-lg bg-white/10 border transition focus:outline-none focus:ring-2 text-white placeholder-gray-400 ${errors.username
                         ? 'border-red-500 focus:ring-red-500'
                         : 'border-purple-500/30 focus:ring-purple-500'
-                    }`}
+                      }`}
                   />
                   {errors.username && <p className="text-red-400 text-sm mt-1">{errors.username}</p>}
                 </div>
@@ -190,11 +189,10 @@ export default function OfficialLogin() {
                     value={formData.password}
                     onChange={handleChange}
                     placeholder="Enter your password"
-                    className={`w-full px-4 py-3 rounded-lg bg-white/10 border transition focus:outline-none focus:ring-2 text-white placeholder-gray-400 ${
-                      errors.password
+                    className={`w-full px-4 py-3 rounded-lg bg-white/10 border transition focus:outline-none focus:ring-2 text-white placeholder-gray-400 ${errors.password
                         ? 'border-red-500 focus:ring-red-500'
                         : 'border-purple-500/30 focus:ring-purple-500'
-                    }`}
+                      }`}
                   />
                   {errors.password && <p className="text-red-400 text-sm mt-1">{errors.password}</p>}
                 </div>
@@ -209,11 +207,10 @@ export default function OfficialLogin() {
                     name="designation"
                     value={formData.designation}
                     onChange={handleChange}
-                    className={`w-full px-4 py-3 rounded-lg bg-white/10 border transition focus:outline-none focus:ring-2 text-white ${
-                      errors.designation
+                    className={`w-full px-4 py-3 rounded-lg bg-white/10 border transition focus:outline-none focus:ring-2 text-white ${errors.designation
                         ? 'border-red-500 focus:ring-red-500'
                         : 'border-purple-500/30 focus:ring-purple-500'
-                    }`}
+                      }`}
                   >
                     <option value="">Select Your Role</option>
                     {DESIGNATIONS.map((designation) => (

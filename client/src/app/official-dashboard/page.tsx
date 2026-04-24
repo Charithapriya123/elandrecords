@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { 
-  FaFileAlt, FaCheckCircle, FaClock, FaExclamationTriangle, 
+import {
+  FaFileAlt, FaCheckCircle, FaClock, FaExclamationTriangle,
   FaChartLine, FaBell, FaUser, FaSignOutAlt, FaHome,
   FaClipboardList, FaMapMarkedAlt, FaRuler, FaCoins,
   FaUserTie, FaBuilding, FaShieldAlt, FaCrown, FaBriefcase
@@ -87,7 +87,7 @@ const ROLE_CONFIG: Record<string, {
     gradient: 'from-rose-600 to-red-600',
     description: 'District Administration Authority'
   },
-  ministryofwelfare: {
+  ministrywelfare: {
     title: 'Ministry of Welfare',
     icon: FaCrown,
     color: 'slate',
@@ -148,7 +148,7 @@ export default function OfficialDashboard() {
     rejected: 0
   });
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
-  
+
   // Survey form states (for Surveyor role)
   const [surveyFormData, setSurveyFormData] = useState({
     pointALat: '',
@@ -165,7 +165,7 @@ export default function OfficialDashboard() {
   const [boundaryMapFile, setBoundaryMapFile] = useState<File | null>(null);
   const [fieldPhotoFiles, setFieldPhotoFiles] = useState<File[]>([]);
   const [uploadingSurvey, setUploadingSurvey] = useState(false);
-  
+
   // Filter states
   const [filters, setFilters] = useState({
     status: 'all',
@@ -220,7 +220,7 @@ export default function OfficialDashboard() {
     // Search term (receipt number, owner name, survey number)
     if (filters.searchTerm) {
       const term = filters.searchTerm.toLowerCase();
-      filtered = filtered.filter(app => 
+      filtered = filtered.filter(app =>
         app.receiptNumber?.toLowerCase().includes(term) ||
         app.ownerName?.toLowerCase().includes(term) ||
         app.surveyNumber?.toLowerCase().includes(term) ||
@@ -241,7 +241,7 @@ export default function OfficialDashboard() {
       console.log('Fetching official data...');
       const response = await fetch('/api/officials/me');
       console.log('Response status:', response.status);
-      
+
       if (response.ok) {
         const data = await response.json();
         console.log('Official data received:', data);
@@ -267,7 +267,7 @@ export default function OfficialDashboard() {
         const currentApplications = data.applications || [];
         console.log('First assigned app:', currentApplications[0]);
         setAssignedApplications(currentApplications);
-        
+
         // Also fetch all applications for filtering purposes
         const allAppsResponse = await fetch('/api/dashboard/all-applications');
         if (allAppsResponse.ok) {
@@ -276,10 +276,10 @@ export default function OfficialDashboard() {
           console.log('First all app:', allData.applications?.[0]);
           setAllApplications(allData.applications || []);
         }
-        
+
         // Set initial applications to assigned
         setApplications(currentApplications);
-        
+
         // Fetch stats (now based on assigned applications only)
         const statsResponse = await fetch('/api/dashboard/stats');
         if (statsResponse.ok) {
@@ -316,7 +316,7 @@ export default function OfficialDashboard() {
   const handleSurveyUpload = async (applicationId: string) => {
     try {
       setUploadingSurvey(true);
-      
+
       const formData = new FormData();
       formData.append('applicationId', applicationId);
       formData.append('pointALat', surveyFormData.pointALat);
@@ -329,11 +329,11 @@ export default function OfficialDashboard() {
       formData.append('pointDLong', surveyFormData.pointDLong);
       formData.append('measuredArea', surveyFormData.measuredArea);
       formData.append('surveyRemarks', surveyFormData.surveyRemarks);
-      
+
       if (boundaryMapFile) {
         formData.append('boundaryMap', boundaryMapFile);
       }
-      
+
       fieldPhotoFiles.forEach((file) => {
         formData.append('fieldPhotos', file);
       });
@@ -399,7 +399,7 @@ export default function OfficialDashboard() {
       console.log('[isAssignedToMe] No official found');
       return false;
     }
-    
+
     console.log('[isAssignedToMe] Checking application:', {
       receiptNumber: app.receiptNumber,
       currentlyWith: app.currentlyWith,
@@ -408,7 +408,7 @@ export default function OfficialDashboard() {
       appStatus: app.status,
       appCurrentStage: app.currentStage,
     });
-    
+
     // First priority: Check if currentlyWith matches the official's ID
     if (app.currentlyWith && official._id) {
       const matches = app.currentlyWith === official._id.toString();
@@ -419,10 +419,10 @@ export default function OfficialDashboard() {
       });
       if (matches) return true;
     }
-    
+
     // Normalize designation (handle variations like project_officer, projectofficer, etc.)
     const designation = official.designation.toLowerCase().replace(/\s+/g, '').replace(/_/g, '');
-    
+
     // Second priority: Check if currentStage matches the official's designation
     if (app.currentStage) {
       const normalizedStage = app.currentStage.toLowerCase().replace(/\s+/g, '').replace(/_/g, '');
@@ -431,36 +431,42 @@ export default function OfficialDashboard() {
         return true;
       }
     }
-    
+
     // Third priority: Check status format (with_<role>)
     const statusMap: Record<string, string> = {
       'clerk': 'with_clerk',
       'superintendent': 'with_superintendent',
-      'projectofficer': 'with_projectofficer',
-      'project_officer': 'with_projectofficer',
+      'projectofficer': 'with_project_officer',
+      'project_officer': 'with_project_officer',
       'mro': 'with_mro',
       'surveyor': 'with_surveyor',
-      'revenueinspector': 'with_revenueinspector',
+      'revenueinspector': 'with_revenue_inspector',
       'vro': 'with_vro',
-      'revenuedeptofficer': 'with_revenuedeptofficer',
-      'jointcollector': 'with_jointcollector',
-      'districtcollector': 'with_districtcollector',
-      'ministrywelfare': 'with_ministrywelfare',
+      'revenuedeptofficer': 'with_revenue_dept',
+      'jointcollector': 'with_joint_collector',
+      'districtcollector': 'with_collector',
+      'ministrywelfare': 'with_ministry_welfare',
     };
-    
+
     const expectedStatus = statusMap[designation];
     if (app.status === expectedStatus) {
       console.log('[isAssignedToMe] Matched via status format');
       return true;
     }
-    
+
+    // Initial State special case for Clerk
+    if (designation === 'clerk' && app.status === 'submitted') {
+      console.log('[isAssignedToMe] Matched via initial submitted state for clerk');
+      return true;
+    }
+
     // Last priority: Check if status contains the designation (e.g., "pending_superintendent_review")
     const normalizedStatus = app.status.toLowerCase().replace(/\s+/g, '').replace(/_/g, '');
     if (normalizedStatus.includes(designation)) {
       console.log('[isAssignedToMe] Matched via status contains designation');
       return true;
     }
-    
+
     console.log('[isAssignedToMe] No match found');
     return false;
   };
@@ -518,7 +524,8 @@ export default function OfficialDashboard() {
     );
   }
 
-  const roleConfig = ROLE_CONFIG[official.designation.toLowerCase().replace(/\s+/g, '')] || ROLE_CONFIG.clerk;
+  const roleDisplayName = official.designation.toLowerCase().replace(/\s+/g, '').replace(/_/g, '');
+  const roleConfig = ROLE_CONFIG[roleDisplayName] || ROLE_CONFIG.clerk;
   const Icon = roleConfig.icon;
 
   return (
@@ -536,7 +543,7 @@ export default function OfficialDashboard() {
                 <p className="text-sm text-blue-200">{roleConfig.description}</p>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-4">
               <div className="text-right mr-4">
                 <p className="text-white font-semibold">{official.firstName} {official.lastName}</p>
@@ -613,21 +620,19 @@ export default function OfficialDashboard() {
             <div className="flex gap-3 mb-4">
               <button
                 onClick={() => setActiveTab('assigned')}
-                className={`flex-1 px-6 py-4 rounded-xl font-bold text-lg transition-all duration-300 border-2 ${
-                  activeTab === 'assigned'
-                    ? 'bg-linear-to-r from-blue-500 to-cyan-500 text-white border-blue-400 shadow-lg shadow-blue-500/50'
-                    : 'bg-white/5 text-blue-200 border-blue-500/30 hover:bg-white/10 hover:border-blue-500/50'
-                }`}
+                className={`flex-1 px-6 py-4 rounded-xl font-bold text-lg transition-all duration-300 border-2 ${activeTab === 'assigned'
+                  ? 'bg-linear-to-r from-blue-500 to-cyan-500 text-white border-blue-400 shadow-lg shadow-blue-500/50'
+                  : 'bg-white/5 text-blue-200 border-blue-500/30 hover:bg-white/10 hover:border-blue-500/50'
+                  }`}
               >
                 📋 Assigned Applications ({assignedApplications.length})
               </button>
               <button
                 onClick={() => setActiveTab('all')}
-                className={`flex-1 px-6 py-4 rounded-xl font-bold text-lg transition-all duration-300 border-2 ${
-                  activeTab === 'all'
-                    ? 'bg-linear-to-r from-purple-500 to-pink-500 text-white border-purple-400 shadow-lg shadow-purple-500/50'
-                    : 'bg-white/5 text-purple-200 border-purple-500/30 hover:bg-white/10 hover:border-purple-500/50'
-                }`}
+                className={`flex-1 px-6 py-4 rounded-xl font-bold text-lg transition-all duration-300 border-2 ${activeTab === 'all'
+                  ? 'bg-linear-to-r from-purple-500 to-pink-500 text-white border-purple-400 shadow-lg shadow-purple-500/50'
+                  : 'bg-white/5 text-purple-200 border-purple-500/30 hover:bg-white/10 hover:border-purple-500/50'
+                  }`}
               >
                 🌐 All Applications ({allApplications.length})
               </button>
@@ -642,29 +647,29 @@ export default function OfficialDashboard() {
                   type="text"
                   placeholder="Search by receipt, owner, survey..."
                   value={filters.searchTerm}
-                  onChange={(e) => setFilters({...filters, searchTerm: e.target.value})}
+                  onChange={(e) => setFilters({ ...filters, searchTerm: e.target.value })}
                   className="px-3 py-2 bg-white/5 border border-blue-500/20 rounded-lg text-white placeholder-blue-300/50 focus:outline-none focus:border-blue-400"
                 />
 
                 {/* Status Filter */}
                 <select
                   value={filters.status}
-                  onChange={(e) => setFilters({...filters, status: e.target.value})}
+                  onChange={(e) => setFilters({ ...filters, status: e.target.value })}
                   className="px-3 py-2 bg-white/5 border border-blue-500/20 rounded-lg text-white focus:outline-none focus:border-blue-400"
                 >
                   <option value="all">All Status</option>
                   <option value="submitted">Submitted</option>
                   <option value="with_clerk">With Clerk</option>
                   <option value="with_superintendent">With Superintendent</option>
-                  <option value="with_projectofficer">With Project Officer</option>
+                  <option value="with_project_officer">With Project Officer</option>
                   <option value="with_mro">With MRO</option>
                   <option value="with_surveyor">With Surveyor</option>
-                  <option value="with_revenueinspector">With Revenue Inspector</option>
+                  <option value="with_revenue_inspector">With Revenue Inspector</option>
                   <option value="with_vro">With VRO</option>
-                  <option value="with_revenuedeptofficer">With Revenue Dept Officer</option>
-                  <option value="with_jointcollector">With Joint Collector</option>
-                  <option value="with_districtcollector">With District Collector</option>
-                  <option value="with_ministrywelfare">With Ministry of Welfare</option>
+                  <option value="with_revenue_dept">With Revenue Dept</option>
+                  <option value="with_joint_collector">With Joint Collector</option>
+                  <option value="with_collector">With District Collector</option>
+                  <option value="with_ministry_welfare">With Ministry of Welfare</option>
                   <option value="completed">Completed</option>
                   <option value="rejected">Rejected</option>
                 </select>
@@ -672,7 +677,7 @@ export default function OfficialDashboard() {
                 {/* State Filter */}
                 <select
                   value={filters.state}
-                  onChange={(e) => setFilters({...filters, state: e.target.value})}
+                  onChange={(e) => setFilters({ ...filters, state: e.target.value })}
                   className="px-3 py-2 bg-white/5 border border-blue-500/20 rounded-lg text-white focus:outline-none focus:border-blue-400"
                 >
                   <option value="all">All States</option>
@@ -684,7 +689,7 @@ export default function OfficialDashboard() {
                 {/* City Filter */}
                 <select
                   value={filters.city}
-                  onChange={(e) => setFilters({...filters, city: e.target.value})}
+                  onChange={(e) => setFilters({ ...filters, city: e.target.value })}
                   className="px-3 py-2 bg-white/5 border border-blue-500/20 rounded-lg text-white focus:outline-none focus:border-blue-400"
                 >
                   <option value="all">All Cities</option>
@@ -696,7 +701,7 @@ export default function OfficialDashboard() {
                 {/* Nature Filter */}
                 <select
                   value={filters.nature}
-                  onChange={(e) => setFilters({...filters, nature: e.target.value})}
+                  onChange={(e) => setFilters({ ...filters, nature: e.target.value })}
                   className="px-3 py-2 bg-white/5 border border-blue-500/20 rounded-lg text-white focus:outline-none focus:border-blue-400"
                 >
                   <option value="all">All Types</option>
@@ -749,11 +754,10 @@ export default function OfficialDashboard() {
                           <td className="px-4 py-3 text-xs text-white">{app.state || 'N/A'}</td>
                           <td className="px-4 py-3 text-xs text-white capitalize">{app.nature || 'N/A'}</td>
                           <td className="px-4 py-3">
-                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                              app.status === 'completed' ? 'bg-green-500/20 text-green-300' :
+                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${app.status === 'completed' ? 'bg-green-500/20 text-green-300' :
                               app.status === 'rejected' ? 'bg-red-500/20 text-red-300' :
-                              'bg-yellow-500/20 text-yellow-300'
-                            }`}>
+                                'bg-yellow-500/20 text-yellow-300'
+                              }`}>
                               {app.status ? app.status.replace(/_/g, ' ').replace('with ', '').toUpperCase() : 'PENDING'}
                             </span>
                           </td>
@@ -893,11 +897,10 @@ export default function OfficialDashboard() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
                       <label className="text-xs text-yellow-300/70 uppercase tracking-wider">Current Status</label>
-                      <p className={`mt-1 font-bold text-lg uppercase tracking-wide ${
-                        selectedApp.status === 'completed' ? 'text-green-400' :
+                      <p className={`mt-1 font-bold text-lg uppercase tracking-wide ${selectedApp.status === 'completed' ? 'text-green-400' :
                         selectedApp.status === 'rejected' ? 'text-red-400' :
-                        'text-yellow-400'
-                      }`}>{selectedApp.status.replace(/_/g, ' ')}</p>
+                          'text-yellow-400'
+                        }`}>{selectedApp.status.replace(/_/g, ' ')}</p>
                     </div>
                     <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
                       <label className="text-xs text-yellow-300/70 uppercase tracking-wider">Submitted On</label>
@@ -985,7 +988,7 @@ export default function OfficialDashboard() {
                       <FaMapMarkedAlt />
                       📍 Survey Data & Field Evidence
                     </h4>
-                    
+
                     {/* GPS Coordinates */}
                     <div className="mb-6">
                       <h5 className="text-md font-semibold text-cyan-200 mb-3">GPS Boundary Coordinates</h5>
@@ -999,7 +1002,7 @@ export default function OfficialDashboard() {
                                 step="0.000001"
                                 placeholder="Latitude"
                                 value={surveyFormData[`point${point}Lat` as keyof typeof surveyFormData]}
-                                onChange={(e) => setSurveyFormData({...surveyFormData, [`point${point}Lat`]: e.target.value})}
+                                onChange={(e) => setSurveyFormData({ ...surveyFormData, [`point${point}Lat`]: e.target.value })}
                                 className="flex-1 px-3 py-2 bg-slate-900/50 border border-cyan-500/20 rounded-lg text-white text-sm focus:outline-none focus:border-cyan-400"
                               />
                               <input
@@ -1007,7 +1010,7 @@ export default function OfficialDashboard() {
                                 step="0.000001"
                                 placeholder="Longitude"
                                 value={surveyFormData[`point${point}Long` as keyof typeof surveyFormData]}
-                                onChange={(e) => setSurveyFormData({...surveyFormData, [`point${point}Long`]: e.target.value})}
+                                onChange={(e) => setSurveyFormData({ ...surveyFormData, [`point${point}Long`]: e.target.value })}
                                 className="flex-1 px-3 py-2 bg-slate-900/50 border border-cyan-500/20 rounded-lg text-white text-sm focus:outline-none focus:border-cyan-400"
                               />
                             </div>
@@ -1023,7 +1026,7 @@ export default function OfficialDashboard() {
                         type="text"
                         placeholder="Enter measured area"
                         value={surveyFormData.measuredArea}
-                        onChange={(e) => setSurveyFormData({...surveyFormData, measuredArea: e.target.value})}
+                        onChange={(e) => setSurveyFormData({ ...surveyFormData, measuredArea: e.target.value })}
                         className="w-full px-4 py-3 bg-slate-900/50 border border-cyan-500/20 rounded-lg text-white focus:outline-none focus:border-cyan-400"
                       />
                     </div>
@@ -1067,7 +1070,7 @@ export default function OfficialDashboard() {
                       <textarea
                         placeholder="Enter any additional observations or remarks..."
                         value={surveyFormData.surveyRemarks}
-                        onChange={(e) => setSurveyFormData({...surveyFormData, surveyRemarks: e.target.value})}
+                        onChange={(e) => setSurveyFormData({ ...surveyFormData, surveyRemarks: e.target.value })}
                         rows={3}
                         className="w-full px-4 py-3 bg-slate-900/50 border border-cyan-500/20 rounded-lg text-white focus:outline-none focus:border-cyan-400 resize-none"
                       />

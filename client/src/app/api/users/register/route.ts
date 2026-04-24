@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import connectDB from '@/lib/db/connect';
 import User from '@/lib/models/User';
 import bcrypt from 'bcryptjs';
@@ -14,6 +15,15 @@ const OTPModel = mongoose.models.OTP || mongoose.model('OTP', otpSchema);
 
 function generateOTP(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+function generateDID(aadhar: string, username: string): string {
+  const hash = crypto
+    .createHash('sha256')
+    .update(`${aadhar}:${username}:${Date.now()}`)
+    .digest('hex')
+    .slice(0, 32);
+  return `did:hf:org1:${hash}`;
 }
 
 export async function POST(req: NextRequest) {
@@ -66,11 +76,13 @@ export async function POST(req: NextRequest) {
       }
 
       const hashedPassword = await bcrypt.hash(password, 12);
+      const did = generateDID(aadhar, username);
       await User.create({
         firstName, middleName, lastName,
         dateOfBirth: new Date(dateOfBirth),
         gender, phone, email, aadhar, address, username,
         password: hashedPassword,
+        did,
       });
 
       await OTPModel.deleteMany({ email });

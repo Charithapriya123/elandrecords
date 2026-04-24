@@ -3,8 +3,9 @@
 # Set environment for Org3 (Collectorate Department)
 # This script sets up the environment variables for Org3 operations
 
+export FABRIC_CFG_PATH=${PWD}/fabric-samples/test-network/docker/peercfg
 export CORE_PEER_TLS_ENABLED=true
-export ORDERER_CA=${PWD}/fabric-samples/test-network/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
+export ORDERER_CA=${PWD}/fabric-samples/test-network/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/ca.crt
 export PEER0_ORG1_CA=${PWD}/fabric-samples/test-network/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt
 export PEER0_ORG2_CA=${PWD}/fabric-samples/test-network/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt
 export PEER0_ORG3_CA=${PWD}/fabric-samples/test-network/organizations/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/tls/ca.crt
@@ -25,13 +26,6 @@ joinChannel() {
     peer channel join -b ${PWD}/fabric-samples/test-network/channel-artifacts/mychannel.block
 }
 
-updateAnchorPeer() {
-    echo "Updating anchor peer for Org3..."
-    peer channel update -o localhost:7050 \
-        --ordererTLSHostnameOverride orderer.example.com \
-        -c mychannel -f ${PWD}/fabric-samples/test-network/channel-artifacts/Org3MSPanchors.tx \
-        --tls $CORE_PEER_TLS_ENABLED --cafile $ORDERER_CA
-}
 
 installChaincode() {
     echo "Installing chaincode on Org3 peer..."
@@ -39,7 +33,9 @@ installChaincode() {
 }
 
 approveChaincode() {
-    echo "Approving chaincode for Org3..."
+    local CHANNEL_ID=${1:-mychannel}
+    local POLICY=${2:-"AND('Org1MSP.member', 'Org2MSP.member', 'Org3MSP.member')"}
+    echo "Approving chaincode for Org3 on channel '$CHANNEL_ID' with policy '$POLICY'..."
     CC_PACKAGE_ID=$(peer lifecycle chaincode queryinstalled | grep "land-registration" | awk '{print $3}' | sed 's/.$//')
 
     peer lifecycle chaincode approveformyorg \
@@ -47,32 +43,33 @@ approveChaincode() {
         --ordererTLSHostnameOverride orderer.example.com \
         --tls $CORE_PEER_TLS_ENABLED \
         --cafile $ORDERER_CA \
-        --channelID mychannel \
+        --channelID $CHANNEL_ID \
         --name land-registration \
         --version 1.0 \
         --package-id $CC_PACKAGE_ID \
-        --sequence 1
+        --sequence 1 \
+        --signature-policy "$POLICY"
 }
 
 commitChaincode() {
-    echo "Committing chaincode to channel..."
+    local CHANNEL_ID=${1:-mychannel}
+    local POLICY=${2:-"AND('Org1MSP.member', 'Org2MSP.member', 'Org3MSP.member')"}
+    echo "Committing chaincode to channel '$CHANNEL_ID' with policy '$POLICY'..."
     CC_PACKAGE_ID=$(peer lifecycle chaincode queryinstalled | grep "land-registration" | awk '{print $3}' | sed 's/.$//')
+
+    local PEER_ARGS="--peerAddresses localhost:7051 --tlsRootCertFiles $PEER0_ORG1_CA --peerAddresses localhost:9051 --tlsRootCertFiles $PEER0_ORG2_CA --peerAddresses localhost:11051 --tlsRootCertFiles $PEER0_ORG3_CA"
 
     peer lifecycle chaincode commit \
         -o localhost:7050 \
         --ordererTLSHostnameOverride orderer.example.com \
         --tls $CORE_PEER_TLS_ENABLED \
         --cafile $ORDERER_CA \
-        --channelID mychannel \
+        --channelID $CHANNEL_ID \
         --name land-registration \
         --version 1.0 \
         --sequence 1 \
-        --peerAddresses localhost:7051 \
-        --tlsRootCertFiles $PEER0_ORG1_CA \
-        --peerAddresses localhost:9051 \
-        --tlsRootCertFiles $PEER0_ORG2_CA \
-        --peerAddresses localhost:11051 \
-        --tlsRootCertFiles $PEER0_ORG3_CA
+        --signature-policy "$POLICY" \
+        $PEER_ARGS
 }
 
 # Display available commands

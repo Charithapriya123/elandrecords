@@ -18,6 +18,7 @@ import {
   FiFileText,
   FiUpload,
   FiInfo,
+  FiDownload,
 } from 'react-icons/fi';
 import { MdOutlineLandscape, MdVerified } from 'react-icons/md';
 import { IoRocketSharp } from 'react-icons/io5';
@@ -155,7 +156,7 @@ export default function ReceiptPage() {
             </div>
             <h1 className="text-4xl font-black text-gray-900 mb-2">LAND REQUEST APPLICATION</h1>
             <p className="text-gray-700 font-semibold text-lg">Official Receipt Document</p>
-            
+
             <div className="mt-8 space-y-1">
               <p className="text-gray-800 font-bold text-sm">Receipt Number: <span className="font-black text-base">{landRequest.receiptNumber}</span></p>
               <p className="text-gray-700 text-sm">Date of Submission: <span className="font-semibold">{new Date(landRequest.createdAt).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' })}</span></p>
@@ -291,28 +292,37 @@ export default function ReceiptPage() {
 
         {/* Action Buttons - Below Document */}
         <div className="max-w-4xl mx-auto mt-8 space-y-4">
-          {/* Submit Button */}
-          <button
-            onClick={handleSubmitToClerk}
-            disabled={isSubmitting}
-            className={`w-full py-4 px-6 rounded-lg font-bold text-lg transition-all duration-300 flex items-center justify-center gap-3 shadow-lg ${
-              isSubmitting
-                ? 'bg-gray-300 text-gray-700 cursor-not-allowed'
-                : 'bg-gray-900 text-white hover:bg-gray-800 hover:shadow-xl active:scale-95'
-            }`}
-          >
-            {isSubmitting ? (
-              <>
-                <FiLoader className="text-2xl animate-spin" />
-                <span>Submitting to Clerk...</span>
-              </>
-            ) : (
-              <>
-                <IoRocketSharp className="text-2xl" />
-                <span>Submit to Clerk for Processing</span>
-              </>
-            )}
-          </button>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <button
+              onClick={() => window.open(`/api/land-requests/generate-pdf?receipt=${landRequest.receiptNumber}`, '_blank')}
+              className="w-full py-4 px-6 rounded-lg font-bold text-lg transition-all duration-300 flex items-center justify-center gap-3 bg-white text-gray-900 border-2 border-gray-900 hover:bg-gray-100 shadow-md hover:shadow-lg active:scale-95"
+            >
+              <FiDownload className="text-2xl" />
+              <span>Download PDF Receipt</span>
+            </button>
+
+            {/* Submit Button */}
+            <button
+              onClick={handleSubmitToClerk}
+              disabled={isSubmitting}
+              className={`w-full py-4 px-6 rounded-lg font-bold text-lg transition-all duration-300 flex items-center justify-center gap-3 shadow-lg ${isSubmitting
+                  ? 'bg-gray-300 text-gray-700 cursor-not-allowed'
+                  : 'bg-gray-900 text-white hover:bg-gray-800 hover:shadow-xl active:scale-95'
+                }`}
+            >
+              {isSubmitting ? (
+                <>
+                  <FiLoader className="text-2xl animate-spin" />
+                  <span>Submitting to Clerk...</span>
+                </>
+              ) : (
+                <>
+                  <IoRocketSharp className="text-2xl" />
+                  <span>Submit to Clerk</span>
+                </>
+              )}
+            </button>
+          </div>
 
           {/* Info Box */}
           <div className="bg-white border-l-4 border-gray-900 rounded-lg p-6 shadow-md">

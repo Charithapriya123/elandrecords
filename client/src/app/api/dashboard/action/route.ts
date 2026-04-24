@@ -4,6 +4,7 @@ import connectDB from '@/lib/db/connect';
 import Official from '@/lib/models/Official';
 import LandRequest from '@/lib/models/LandRequest';
 import { apiCall, API_CONFIG } from '@/lib/fabric-api';
+import { sendEmailAlert } from '@/lib/sendEmail';
 
 export async function POST(req: NextRequest) {
   try {
@@ -114,7 +115,15 @@ export async function POST(req: NextRequest) {
     let result;
 
     // Route to appropriate blockchain action based on action type and user role
-    switch (action.toLowerCase()) {
+    const finalApproveRoles = ['joint_collector', 'collector', 'mw', 'ministry_welfare', 'ministrywelfare'];
+
+    // Automatically map intermediate approval to forward
+    let resolvedAction = action.toLowerCase();
+    if (resolvedAction === 'approve' && !finalApproveRoles.includes(currentUser.role)) {
+      resolvedAction = 'forward';
+    }
+
+    switch (resolvedAction) {
       case 'forward':
       case 'submit':
         // Allow all roles in the workflow to forward applications
@@ -241,40 +250,58 @@ export async function POST(req: NextRequest) {
 
       // If Ministry of Welfare approved, set status to 'completed' for UI compatibility
       const ministryWelfareRoles = ['mw', 'ministry_welfare', 'ministrywelfare'];
-      if (ministryWelfareRoles.includes(currentUser.role) && action === 'approve') {
+      if (ministryWelfareRoles.includes(currentUser.role) && resolvedAction === 'approve') {
         finalStatus = 'completed';
       }
 
-      if (result.data && typeof result.data === 'object' && result.data.status) {
-        await LandRequest.findByIdAndUpdate(applicationId, {
-          status: finalStatus,
-          updatedAt: new Date(),
-          lastAction: action,
-          lastActionBy: official._id,
-          lastActionAt: new Date(),
-        });
-        console.log(`Updated MongoDB status for application ${applicationId} to ${finalStatus}`);
-      } else if (result.data && typeof result.data === 'string') {
-        // Try to parse if it's a JSON string
-        try {
-          const parsedData = JSON.parse(result.data);
-          if (parsedData.status) {
-            await LandRequest.findByIdAndUpdate(applicationId, {
-              status: finalStatus,
-              updatedAt: new Date(),
-              lastAction: action,
-              lastActionBy: official._id,
-              lastActionAt: new Date(),
-            });
-            console.log(`Updated MongoDB status for application ${applicationId} to ${finalStatus}`);
-          }
-        } catch (parseError) {
-          console.error('Failed to parse blockchain response:', parseError);
-        }
-      }
+      // Prepare history entry with Real Transaction ID
+      const historyEntry = {
+        transactionId: result.txId || `TXN-${Date.now()}`,
+        officialId: official._id,
+        officialName: `${official.firstName} ${official.lastName}`,
+        designation: official.designation,
+        action: (resolvedAction === 'forward' || resolvedAction === 'submit') ? 'forwarded' :
+          (resolvedAction === 'approve') ? 'approved' :
+            (resolvedAction === 'reject') ? 'rejected' : 'data_added',
+        remarks: remarks || `Action ${action} performed`,
+        timestamp: new Date(),
+        data: officialData,
+      };
+
+      await LandRequest.findByIdAndUpdate(applicationId, {
+        status: finalStatus,
+        updatedAt: new Date(),
+        lastAction: action,
+        lastActionBy: official._id,
+        lastActionAt: new Date(),
+        $push: { actionHistory: historyEntry }
+      });
+      console.log(`Updated MongoDB status and history for ${applicationId} to ${finalStatus} | Tx: ${result.txId}`);
     } catch (updateError) {
       console.error('Failed to update MongoDB status:', updateError);
       // Don't fail the request if MongoDB update fails, but log it
+    }
+
+    // Send email notification to user
+    try {
+      if (application && application.email) {
+        const statusText = action === 'approve' ? (['mw', 'ministry_welfare', 'ministrywelfare'].includes(currentUser.role) ? 'Final Approval' : 'Approved Forward') : action;
+        await sendEmailAlert({
+          to: application.email,
+          subject: `Update on Land Request: ${application.receiptNumber}`,
+          html: `
+            <h2>Application Status Update</h2>
+            <p>Dear ${application.fullName},</p>
+            <p>Your land registration application (Receipt: <strong>${application.receiptNumber}</strong>) has a new update.</p>
+            <p><strong>Action:</strong> ${statusText.toUpperCase()}</p>
+            <p><strong>By:</strong> ${official.designation.replace(/_/g, ' ').toUpperCase()}</p>
+            ${remarks ? `<p><strong>Remarks:</strong> ${remarks}</p>` : ''}
+            <p>Please check your dashboard for more details.</p>
+          `
+        });
+      }
+    } catch (emailError) {
+      console.error('Failed to send email alert:', emailError);
     }
 
     return NextResponse.json({
