@@ -57,20 +57,25 @@ generate_artifacts() {
 
     cd fabric-samples/test-network
 
+    # Stop and remove any running containers and networks from old runs
+    print_status "Tearing down old network..."
+    docker-compose -f docker/docker-compose-full.yaml down -v
+    docker network rm fabric_test 2>/dev/null || true
+
+    # Set FABRIC_CFG_PATH to current directory so configtxgen finds our configtx.yaml
+    export FABRIC_CFG_PATH=${PWD}
+
     # Generate crypto materials first
     print_status "Generating crypto materials..."
+    rm -rf organizations/ordererOrganizations organizations/peerOrganizations
     cryptogen generate --config=./crypto-config.yaml --output="organizations"
+    
+    # Generate channel genesis block (channel participation mode - no system channel needed)
+    print_status "Generating channel genesis block..."
+    configtxgen -profile ThreeOrgsChannel -outputBlock ./channel-artifacts/mychannel.block -channelID mychannel
 
-    # Generate genesis block
-    print_status "Generating genesis block..."
-    configtxgen -profile ThreeOrgsOrdererGenesis -channelID system-channel -outputBlock ./system-genesis-block/genesis.block
-
-    # Generate channel artifacts
-    print_status "Generating channel artifacts..."
-    configtxgen -profile ThreeOrgsChannel -outputCreateChannelTx ./channel-artifacts/mychannel.tx -channelID mychannel
-    configtxgen -profile ThreeOrgsChannel -outputAnchorPeersUpdate ./channel-artifacts/Org1MSPanchors.tx -channelID mychannel -asOrg Org1MSP
-    configtxgen -profile ThreeOrgsChannel -outputAnchorPeersUpdate ./channel-artifacts/Org2MSPanchors.tx -channelID mychannel -asOrg Org2MSP
-    configtxgen -profile ThreeOrgsChannel -outputAnchorPeersUpdate ./channel-artifacts/Org3MSPanchors.tx -channelID mychannel -asOrg Org3MSP
+    # Generate connection profiles for the API
+    ./organizations/ccp-generate.sh
 
     cd ../..
     print_status "Artifacts generated successfully."
@@ -87,13 +92,14 @@ start_network() {
     sleep 15
 
     # Check if all containers are running
-    RUNNING=$(docker-compose -f docker/docker-compose-full.yaml ps | grep "Up" | wc -l)
-    TOTAL=$(docker-compose -f docker/docker-compose-full.yaml ps | grep -v "Name" | wc -l)
+    RUNNING=$(docker ps --filter "network=fabric_test" --format "{{.Names}}" | wc -l)
+    TOTAL=$(docker-compose -f docker/docker-compose-full.yaml config --services | wc -l)
 
-    if [ "$RUNNING" -eq "$TOTAL" ]; then
+    if [ "$RUNNING" -ge "$TOTAL" ]; then
         print_status "Network started successfully ($RUNNING/$TOTAL containers running)."
     else
         print_error "Some containers failed to start ($RUNNING/$TOTAL running)."
+        docker ps -a --filter "network=fabric_test" --format "table {{.Names}}\t{{.Status}}"
         exit 1
     fi
 
@@ -104,27 +110,51 @@ start_network() {
 setup_channel() {
     print_header "Setting up channel and joining organizations..."
 
-    # Create channel with Org1
-    print_status "Creating channel with Org1..."
-    source setOrg1.sh
-    createChannel
+    # Orderer TLS certs for osnadmin
+    ORDERER_CA=${PWD}/fabric-samples/test-network/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/ca.crt
+    ORDERER_ADMIN_TLS_SIGN_CERT=${PWD}/fabric-samples/test-network/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.crt
+    ORDERER_ADMIN_TLS_PRIVATE_KEY=${PWD}/fabric-samples/test-network/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.key
+
+    # Create mychannel using osnadmin (channel participation API)
+    print_status "Joining all orderers to 'mychannel'..."
+    for node in 7053 8053 9053; do
+        port=$node
+        case $port in
+            7053) host="orderer.example.com" ;;
+            8053) host="orderer2.example.com" ;;
+            9053) host="orderer3.example.com" ;;
+        esac
+        
+        echo "Joining $host to mychannel via localhost:$port..."
+        
+        # Determine correct TLS paths for each orderer
+        NODE_TLS_DIR=${PWD}/fabric-samples/test-network/organizations/ordererOrganizations/example.com/orderers/$host/tls
+        
+        osnadmin channel join --channelID mychannel \
+            --config-block ${PWD}/fabric-samples/test-network/channel-artifacts/mychannel.block \
+            -o localhost:$port \
+            --ca-file $NODE_TLS_DIR/ca.crt \
+            --client-cert $NODE_TLS_DIR/server.crt \
+            --client-key $NODE_TLS_DIR/server.key
+    done
+
+    print_status "Waiting for Raft leader election (mychannel)..."
+    sleep 10
 
     # Join Org1 to channel
     print_status "Org1 joining channel..."
+    source setorg1.sh
     joinChannel
-    updateAnchorPeer
 
     # Join Org2 to channel
     print_status "Org2 joining channel..."
-    source setOrg2.sh
+    source setorg2.sh
     joinChannel
-    updateAnchorPeer
 
     # Join Org3 to channel
     print_status "Org3 joining channel..."
-    source setOrg3.sh
+    source setorg3.sh
     joinChannel
-    updateAnchorPeer
 
     print_status "Channel setup completed."
 }
@@ -144,38 +174,31 @@ setup_chaincode() {
     peer lifecycle chaincode package chaincode/land-registration.tar.gz \
         --path chaincode/land-registration \
         --lang node \
-        --label land-registration_1.0
+        --label land-registration_1.2
 
     # Install on all organizations
     print_status "Installing chaincode on Org1..."
-    source setOrg1.sh
+    source setorg1.sh
     installChaincode
 
     print_status "Installing chaincode on Org2..."
-    source setOrg2.sh
+    source setorg2.sh
     installChaincode
 
     print_status "Installing chaincode on Org3..."
-    source setOrg3.sh
+    source setorg3.sh
     installChaincode
 
-    # Approve chaincode
-    print_status "Approving chaincode for Org1..."
-    source setOrg1.sh
-    approveChaincode
+    # Approve chaincode for mychannel
+    print_status "Approving chaincode for mychannel..."
+    local POLICY="AND('Org1MSP.member', 'Org2MSP.member', 'Org3MSP.member')"
+    source setorg1.sh && approveChaincode mychannel "$POLICY"
+    source setorg2.sh && approveChaincode mychannel "$POLICY"
+    source setorg3.sh && approveChaincode mychannel "$POLICY"
 
-    print_status "Approving chaincode for Org2..."
-    source setOrg2.sh
-    approveChaincode
-
-    print_status "Approving chaincode for Org3..."
-    source setOrg3.sh
-    approveChaincode
-
-    # Commit chaincode
-    print_status "Committing chaincode to channel..."
-    source setOrg3.sh
-    commitChaincode
+    # Commit chaincode to mychannel
+    print_status "Committing chaincode to mychannel..."
+    source setorg3.sh && commitChaincode mychannel "$POLICY"
 
     print_status "Chaincode setup completed."
 }
@@ -202,7 +225,12 @@ main() {
     start_network
     setup_channel
     setup_chaincode
-    register_users
+    # register_users
+    print_status "Enrolling users with ABAC attributes..."
+    cd fabric-samples/test-network
+    chmod +x enrollWithABAC.sh
+    ./enrollWithABAC.sh
+    cd ../..
 
     print_header "=========================================="
     print_status "Network setup completed successfully!"

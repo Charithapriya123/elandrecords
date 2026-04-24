@@ -8,6 +8,7 @@ export interface IDigiLockerRequest extends Document {
   citizenEmail: string;
   documentType: string;
   ipfsHash: string;
+  docHash: string;
   status: 'pending' | 'approved' | 'rejected';
   requestedAt: Date;
   respondedAt?: Date;
@@ -21,7 +22,8 @@ const DigiLockerRequestSchema = new Schema({
   citizenUsername: { type: String, required: true },
   citizenEmail: { type: String, required: true },
   documentType: { type: String, required: true },
-  ipfsHash: { type: String, required: true },
+  ipfsHash: { type: String, required: false, default: '' },
+  docHash: { type: String, required: false, default: '' },
   status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
   requestedAt: { type: Date, default: Date.now },
   respondedAt: { type: Date },

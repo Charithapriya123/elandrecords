@@ -14,36 +14,34 @@ async function main() {
 
         const orgs = ['org1', 'org2', 'org3'];
 
-        // Helper to get crypto material paths
-        const getCryptoPath = (org, userType) => {
-            const domain = `${org}.example.com`;
-            const userName = userType === 'admin' ? `Admin@${domain}` : `User1@${domain}`;
-            const mspPath = path.join(testNetworkPath, 'organizations', 'peerOrganizations', domain, 'users', userName, 'msp');
-            const certPath = path.join(mspPath, 'signcerts', `${userName}-cert.pem`);
-            const keystorePath = path.join(mspPath, 'keystore');
-
-            // keystore has random file name
-            const keyFiles = fs.readdirSync(keystorePath);
-            const keyPath = path.join(keystorePath, keyFiles[0]);
-
-            return { certPath, keyPath, mspId: org.charAt(0).toUpperCase() + org.slice(1) + 'MSP' };
-        };
-
         for (const [username, org] of Object.entries(userOrgMap)) {
             console.log(`Processing user: ${username} for ${org}`);
 
-            // Ensure wallet exists
+            const domain = `${org}.example.com`;
             const walletPath = path.join(walletsPath, org);
             const wallet = await Wallets.newFileSystemWallet(walletPath);
 
-            // Determine if this is an admin-like user or regular user configuration mapping
-            // For simplicity, map 'admin-' prefixed users to Admin crypto, others to User1 crypto
-            const userType = username.startsWith('admin-') ? 'admin' : 'user';
+            // Path for CA identity (preferred for ABAC)
+            const caMspPath = path.join(testNetworkPath, 'organizations', 'peerOrganizations', domain, 'users', username, 'msp');
 
-            const { certPath, keyPath, mspId } = getCryptoPath(org, userType);
+            let certPath, keyPath;
+            if (fs.existsSync(caMspPath)) {
+                certPath = path.join(caMspPath, 'signcerts', 'cert.pem');
+                const keystorePath = path.join(caMspPath, 'keystore');
+                const keyFiles = fs.readdirSync(keystorePath);
+                keyPath = path.join(keystorePath, keyFiles[0]);
+            } else {
+                // Fallback to Admin@org/User1@org
+                const cryptogenUser = username.startsWith('admin-') ? `Admin@${domain}` : `User1@${domain}`;
+                const mspPath = path.join(testNetworkPath, 'organizations', 'peerOrganizations', domain, 'users', cryptogenUser, 'msp');
+                certPath = path.join(mspPath, 'signcerts', `${cryptogenUser}-cert.pem`);
+                const keystorePath = path.join(mspPath, 'keystore');
+                const keyFiles = fs.readdirSync(keystorePath);
+                keyPath = path.join(keystorePath, keyFiles[0]);
+            }
 
             if (!fs.existsSync(certPath) || !fs.existsSync(keyPath)) {
-                console.error(`Crypto files not found for ${username} (${userType}) in ${org}. Skipping.`);
+                console.error(`Crypto files not found for ${username}. Skipping.`);
                 continue;
             }
 
@@ -51,11 +49,8 @@ async function main() {
             const key = fs.readFileSync(keyPath).toString();
 
             const identity = {
-                credentials: {
-                    certificate: cert,
-                    privateKey: key,
-                },
-                mspId: mspId,
+                credentials: { certificate: cert, privateKey: key },
+                mspId: org.charAt(0).toUpperCase() + org.slice(1) + 'MSP',
                 type: 'X.509',
             };
 

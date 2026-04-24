@@ -3,8 +3,8 @@
 import { useState, FormEvent } from 'react';
 import Link from 'next/link';
 import OTPModal from '@/components/OTPModal';
-import { DESIGNATIONS, DESIGNATION_LABELS } from '@/lib/models/Official';
-import { 
+import { DESIGNATIONS, DESIGNATION_LABELS } from '@/lib/constants';
+import {
   FaShieldAlt, FaUser, FaEnvelope, FaPhone, FaLock, FaCheckCircle, FaTimesCircle, FaArrowRight, FaBuilding,
   FaMap, FaLandmark, FaMapPin, FaFileAlt, FaBriefcase
 } from 'react-icons/fa';
@@ -243,11 +243,10 @@ export default function OfficialRegistration() {
                             name="firstName"
                             value={formData.firstName}
                             onChange={handleChange}
-                            className={`w-full px-3 py-2 rounded-lg bg-white/10 border transition focus:outline-none focus:ring-2 text-white placeholder-gray-400 text-sm ${
-                              errors.firstName
+                            className={`w-full px-3 py-2 rounded-lg bg-white/10 border transition focus:outline-none focus:ring-2 text-white placeholder-gray-400 text-sm ${errors.firstName
                                 ? 'border-red-500 focus:ring-red-500'
                                 : 'border-purple-500/30 focus:ring-purple-500'
-                            }`}
+                              }`}
                             placeholder="John"
                           />
                           {errors.firstName && <p className="text-red-400 text-xs mt-1">{errors.firstName}</p>}
@@ -261,11 +260,10 @@ export default function OfficialRegistration() {
                             name="designation"
                             value={formData.designation}
                             onChange={handleChange}
-                            className={`w-full px-3 py-2 rounded-lg bg-white/10 border transition focus:outline-none focus:ring-2 text-white text-sm ${
-                              errors.designation
+                            className={`w-full px-3 py-2 rounded-lg bg-white/10 border transition focus:outline-none focus:ring-2 text-white text-sm ${errors.designation
                                 ? 'border-red-500 focus:ring-red-500'
                                 : 'border-purple-500/30 focus:ring-purple-500'
-                            }`}
+                              }`}
                           >
                             <option value="">Select Role</option>
                             {DESIGNATIONS.map((designation) => (
@@ -286,11 +284,10 @@ export default function OfficialRegistration() {
                             name="email"
                             value={formData.email}
                             onChange={handleChange}
-                            className={`w-full px-3 py-2 rounded-lg bg-white/10 border transition focus:outline-none focus:ring-2 text-white placeholder-gray-400 text-sm ${
-                              errors.email
+                            className={`w-full px-3 py-2 rounded-lg bg-white/10 border transition focus:outline-none focus:ring-2 text-white placeholder-gray-400 text-sm ${errors.email
                                 ? 'border-red-500 focus:ring-red-500'
                                 : 'border-purple-500/30 focus:ring-purple-500'
-                            }`}
+                              }`}
                             placeholder="official@email.com"
                           />
                           {errors.email && <p className="text-red-400 text-xs mt-1">{errors.email}</p>}
@@ -309,11 +306,10 @@ export default function OfficialRegistration() {
                             name="lastName"
                             value={formData.lastName}
                             onChange={handleChange}
-                            className={`w-full px-3 py-2 rounded-lg bg-white/10 border transition focus:outline-none focus:ring-2 text-white placeholder-gray-400 text-sm ${
-                              errors.lastName
+                            className={`w-full px-3 py-2 rounded-lg bg-white/10 border transition focus:outline-none focus:ring-2 text-white placeholder-gray-400 text-sm ${errors.lastName
                                 ? 'border-red-500 focus:ring-red-500'
                                 : 'border-purple-500/30 focus:ring-purple-500'
-                            }`}
+                              }`}
                             placeholder="Doe"
                           />
                           {errors.lastName && <p className="text-red-400 text-xs mt-1">{errors.lastName}</p>}
@@ -328,11 +324,10 @@ export default function OfficialRegistration() {
                             name="department"
                             value={formData.department}
                             onChange={handleChange}
-                            className={`w-full px-3 py-2 rounded-lg bg-white/10 border transition focus:outline-none focus:ring-2 text-white placeholder-gray-400 text-sm ${
-                              errors.department
+                            className={`w-full px-3 py-2 rounded-lg bg-white/10 border transition focus:outline-none focus:ring-2 text-white placeholder-gray-400 text-sm ${errors.department
                                 ? 'border-red-500 focus:ring-red-500'
                                 : 'border-purple-500/30 focus:ring-purple-500'
-                            }`}
+                              }`}
                             placeholder="Revenue"
                           />
                           {errors.department && <p className="text-red-400 text-xs mt-1">{errors.department}</p>}
@@ -347,11 +342,10 @@ export default function OfficialRegistration() {
                             name="phone"
                             value={formData.phone}
                             onChange={handleChange}
-                            className={`w-full px-3 py-2 rounded-lg bg-white/10 border transition focus:outline-none focus:ring-2 text-white placeholder-gray-400 text-sm ${
-                              errors.phone
+                            className={`w-full px-3 py-2 rounded-lg bg-white/10 border transition focus:outline-none focus:ring-2 text-white placeholder-gray-400 text-sm ${errors.phone
                                 ? 'border-red-500 focus:ring-red-500'
                                 : 'border-purple-500/30 focus:ring-purple-500'
-                            }`}
+                              }`}
                             placeholder="1234567890"
                           />
                           {errors.phone && <p className="text-red-400 text-xs mt-1">{errors.phone}</p>}
@@ -370,11 +364,10 @@ export default function OfficialRegistration() {
                             name="officeId"
                             value={formData.officeId}
                             onChange={handleChange}
-                            className={`w-full px-3 py-2 rounded-lg bg-white/10 border transition focus:outline-none focus:ring-2 text-white placeholder-gray-400 text-sm ${
-                              errors.officeId
+                            className={`w-full px-3 py-2 rounded-lg bg-white/10 border transition focus:outline-none focus:ring-2 text-white placeholder-gray-400 text-sm ${errors.officeId
                                 ? 'border-red-500 focus:ring-red-500'
                                 : 'border-purple-500/30 focus:ring-purple-500'
-                            }`}
+                              }`}
                             placeholder="OFF-001"
                           />
                           {errors.officeId && <p className="text-red-400 text-xs mt-1">{errors.officeId}</p>}
@@ -389,11 +382,10 @@ export default function OfficialRegistration() {
                             name="username"
                             value={formData.username}
                             onChange={handleChange}
-                            className={`w-full px-3 py-2 rounded-lg bg-white/10 border transition focus:outline-none focus:ring-2 text-white placeholder-gray-400 text-sm ${
-                              errors.username
+                            className={`w-full px-3 py-2 rounded-lg bg-white/10 border transition focus:outline-none focus:ring-2 text-white placeholder-gray-400 text-sm ${errors.username
                                 ? 'border-red-500 focus:ring-red-500'
                                 : 'border-purple-500/30 focus:ring-purple-500'
-                            }`}
+                              }`}
                             placeholder="username"
                           />
                           {errors.username && <p className="text-red-400 text-xs mt-1">{errors.username}</p>}
@@ -408,11 +400,10 @@ export default function OfficialRegistration() {
                             name="password"
                             value={formData.password}
                             onChange={handleChange}
-                            className={`w-full px-3 py-2 rounded-lg bg-white/10 border transition focus:outline-none focus:ring-2 text-white placeholder-gray-400 text-sm ${
-                              errors.password
+                            className={`w-full px-3 py-2 rounded-lg bg-white/10 border transition focus:outline-none focus:ring-2 text-white placeholder-gray-400 text-sm ${errors.password
                                 ? 'border-red-500 focus:ring-red-500'
                                 : 'border-purple-500/30 focus:ring-purple-500'
-                            }`}
+                              }`}
                             placeholder="••••••"
                           />
                           {errors.password && <p className="text-red-400 text-xs mt-1">{errors.password}</p>}
@@ -431,11 +422,10 @@ export default function OfficialRegistration() {
                             name="password2"
                             value={formData.password2}
                             onChange={handleChange}
-                            className={`w-full px-3 py-2 rounded-lg bg-white/10 border transition focus:outline-none focus:ring-2 text-white placeholder-gray-400 ${
-                              errors.password2
+                            className={`w-full px-3 py-2 rounded-lg bg-white/10 border transition focus:outline-none focus:ring-2 text-white placeholder-gray-400 ${errors.password2
                                 ? 'border-red-500 focus:ring-red-500'
                                 : 'border-purple-500/30 focus:ring-purple-500'
-                            }`}
+                              }`}
                             placeholder="••••••"
                           />
                           {errors.password2 && <p className="text-red-400 text-xs mt-1">{errors.password2}</p>}

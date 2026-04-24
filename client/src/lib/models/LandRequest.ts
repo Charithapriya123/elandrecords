@@ -5,14 +5,14 @@ export interface ILandRequest extends Document {
   txnId?: string;
   nature: 'electronic' | 'physical';
   createdBy: string; // User ID
-  
+
   // Personal Details
   fullName: string;
   email: string;
   phoneNumber: string;
   aadharNumber: string;
   dob: Date;
-  
+
   // Land Registration Details
   ownerName: string;
   surveyNumber: string;
@@ -21,34 +21,35 @@ export interface ILandRequest extends Document {
   state: string;
   city: string;
   pincode: string;
-  
+
   // Document Uploads
   documentUrl?: string;
   receiptUrl?: string;
   pattaUrl?: string;
   ipfsHash?: string;
-  
+  docHash?: string;
+
   // Receipt Number
   receiptNumber: string;
-  
+
   // Workflow
   status: 'submitted' | 'with_clerk' | 'with_superintendent' | 'with_projectofficer' | 'with_vro' | 'with_surveyor' | 'with_revenueinspector' | 'with_mro' | 'with_revenuedeptofficer' | 'with_jointcollector' | 'with_districtcollector' | 'with_ministrywelfare' | 'approved' | 'completed' | 'rejected';
   currentlyWith?: string; // Official ID
-  
+
   // Patta Certificate Fields
   pattaHash?: string; // IPFS hash of generated Patta
   pattaNumber?: string; // Patta certificate number
   certificateNumber?: string; // Full certificate number
   pattaGeneratedAt?: Date; // Date when Patta was generated
   pattaHtmlContent?: string; // Store HTML content directly (fallback for blocked IPFS)
-  
+
   // Additional Fields for Patta Generation
   fatherName?: string;
   aadhaar?: string;
   district?: string;
   mandal?: string;
   village?: string;
-  
+
   // Survey Data (added by Surveyor)
   surveyData?: {
     pointA?: { lat: number; long: number };
@@ -61,7 +62,7 @@ export interface ILandRequest extends Document {
   };
   fieldPhotos?: string[]; // Array of IPFS hashes for field photos
   surveyRemarks?: string;
-  
+
   // History/Timeline - Track all official actions
   actionHistory?: Array<{
     officialId: string;
@@ -71,15 +72,16 @@ export interface ILandRequest extends Document {
     remarks?: string;
     timestamp: Date;
     data?: any; // Role-specific data added by the official
+    blockNumber?: number;
   }>;
-  
+
   // Additional Fields
   compNo?: string;
   fileNo?: string;
   subject?: string;
   sentTo?: string;
   dueOn?: Date;
-  
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -151,6 +153,7 @@ const landRequestSchema = new Schema<ILandRequest>(
     receiptUrl: String,
     pattaUrl: String,
     ipfsHash: String,
+    docHash: String,
     receiptNumber: {
       type: String,
       unique: true,
@@ -207,6 +210,7 @@ const landRequestSchema = new Schema<ILandRequest>(
           unique: false, // Multiple actions can exist, but each has unique txId
           index: true,
         },
+        blockNumber: Number,
         officialId: String,
         officialName: String,
         designation: String,

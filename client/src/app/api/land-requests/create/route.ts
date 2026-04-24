@@ -82,6 +82,8 @@ export async function POST(req: NextRequest) {
 
     console.log(`Land application ${applicationId} created on blockchain`);
 
+    const docHash = crypto.createHash('sha256').update(surveyNumber + ownerName + ipfsHash).digest('hex');
+
     // Save to MongoDB
     await connectDB();
     const landRequest = new LandRequest({
@@ -101,6 +103,7 @@ export async function POST(req: NextRequest) {
       city,
       pincode,
       ipfsHash,
+      docHash,
       status: 'submitted',
     });
 

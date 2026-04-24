@@ -113,6 +113,8 @@ Orderer: &OrdererDefaults
   OrdererType: etcdraft
   Addresses:
     - orderer.example.com:7050
+    - orderer2.example.com:8050
+    - orderer3.example.com:9050
   BatchTimeout: 2s
   BatchSize:
     MaxMessageCount: 10
@@ -124,6 +126,14 @@ Orderer: &OrdererDefaults
         Port: 7050
         ClientTLSCert: organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.crt
         ServerTLSCert: organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.crt
+      - Host: orderer2.example.com
+        Port: 8050
+        ClientTLSCert: organizations/ordererOrganizations/example.com/orderers/orderer2.example.com/tls/server.crt
+        ServerTLSCert: organizations/ordererOrganizations/example.com/orderers/orderer2.example.com/tls/server.crt
+      - Host: orderer3.example.com
+        Port: 9050
+        ClientTLSCert: organizations/ordererOrganizations/example.com/orderers/orderer3.example.com/tls/server.crt
+        ServerTLSCert: organizations/ordererOrganizations/example.com/orderers/orderer3.example.com/tls/server.crt
   Organizations:
   Policies:
     Readers:
@@ -154,27 +164,31 @@ Channel: &ChannelDefaults
     <<: *ChannelCapabilities
 
 Profiles:
-  ThreeOrgsOrdererGenesis:
+  ThreeOrgsChannel:
     <<: *ChannelDefaults
     Orderer:
       <<: *OrdererDefaults
       Organizations:
         - *OrdererOrg
       Capabilities: *OrdererCapabilities
-    Consortiums:
-      SampleConsortium:
-        Organizations:
-          - *Org1
-          - *Org2
-          - *Org3
-
-  ThreeOrgsChannel:
-    Consortium: SampleConsortium
-    <<: *ChannelDefaults
     Application:
       <<: *ApplicationDefaults
       Organizations:
         - *Org1
+        - *Org2
+        - *Org3
+      Capabilities: *ApplicationCapabilities
+
+  InvestigationChannel:
+    <<: *ChannelDefaults
+    Orderer:
+      <<: *OrdererDefaults
+      Organizations:
+        - *OrdererOrg
+      Capabilities: *OrdererCapabilities
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
         - *Org2
         - *Org3
       Capabilities: *ApplicationCapabilities

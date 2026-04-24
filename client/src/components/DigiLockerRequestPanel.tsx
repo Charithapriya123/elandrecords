@@ -25,7 +25,7 @@ export default function DigiLockerRequestPanel({ aadharNumber, receiptNumber, of
 
   const checkExistingRequest = async () => {
     try {
-      const res = await fetch('/api/digilocker/request?receiptNumber=' + receiptNumber + '&officialId=' + officialId);
+      const res = await fetch('/api/digilocker/request?receiptNumber=' + receiptNumber);
       const data = await res.json();
       if (data.requests && data.requests.length > 0) {
         const req = data.requests[0];

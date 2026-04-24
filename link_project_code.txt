@@ -1,0 +1,11 @@
+# Submission Link: Project Source Code
+**Name:** ATMURI CHARITHA PRIYA
+**Roll No:** 25CSM2S10
+
+## Full Project Source Code
+The complete source code for the Land Registration Platform, including the smart contracts (Chaincode), API layer, and Frontend, is available at the link below:
+
+**Drive Link:** https://drive.google.com/drive/folders/1EmUy4YUXx7qUm39w9vj4cFQGBXMC0bmj?usp=sharing
+
+---
+*This document serves as a placeholder for the full project code repository.*

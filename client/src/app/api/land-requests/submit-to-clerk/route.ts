@@ -6,6 +6,7 @@ import LandApplication from '@/lib/models/LandApplication';
 import Official from '@/lib/models/Official';
 import crypto from 'crypto';
 import { apiCall, API_CONFIG } from '@/lib/fabric-api';
+import { sendEmailAlert } from '@/lib/sendEmail';
 
 export async function POST(req: NextRequest) {
   try {
@@ -135,6 +136,21 @@ export async function POST(req: NextRequest) {
     });
 
     console.log('History entry created:', historyId);
+
+    // Send Email Alert
+    await sendEmailAlert({
+      to: landRequest.email,
+      subject: `Application Submitted - ${landRequest.receiptNumber}`,
+      html: `
+        <h2>Application Submitted Successfully</h2>
+        <p>Dear ${landRequest.fullName},</p>
+        <p>Your land registration application (Receipt: <strong>${landRequest.receiptNumber}</strong>) has been successfully submitted to the Clerk for processing.</p>
+        <p>You can track the progress of your application in the Status tab of your dashboard.</p>
+        <br/>
+        <p>Regards,<br/>E-Land Records System</p>
+      `
+    });
+
     console.log('=== SUBMIT TO CLERK COMPLETE ===');
 
     return NextResponse.json({

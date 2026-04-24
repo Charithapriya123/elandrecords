@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { FaArrowLeft, FaUser, FaMapMarkedAlt, FaHome, FaClock, FaFileAlt, FaCheckCircle, FaExclamationTriangle } from 'react-icons/fa';
+import { FaArrowLeft, FaUser, FaMapMarkedAlt, FaHome, FaClock, FaFileAlt, FaCheckCircle, FaExclamationTriangle, FaShieldAlt } from 'react-icons/fa';
 import SuperintendentFields, { type SuperintendentFieldsHandle } from '@/components/roleFields/SuperintendentFields';
 import ProjectOfficerFields, { type ProjectOfficerFieldsHandle } from '@/components/roleFields/ProjectOfficerFields';
 import RevenueInspectorFields, { type RevenueInspectorFieldsHandle } from '@/components/roleFields/RevenueInspectorFields';
@@ -16,6 +16,9 @@ import MROFields, { type MROFieldsHandle } from '@/components/roleFields/MROFiel
 import ClerkFields, { type ClerkFieldsHandle } from '@/components/roleFields/ClerkFields';
 import ApplicationHistory from '@/components/ApplicationHistory';
 import DigiLockerRequestPanel from '@/components/DigiLockerRequestPanel';
+import OCRAnalysisPanel from '@/components/OCRAnalysisPanel';
+import AITrustScore from '@/components/AITrustScore';
+import DIDDisplay from '@/components/DIDDisplay';
 
 interface Official {
   _id?: string;
@@ -43,6 +46,7 @@ interface Application {
   pincode?: string;
   nature?: string;
   ipfsHash?: string;
+  docHash?: string;
   aadharNumber?: string;
   currentlyWith?: string;
   currentStage?: string;
@@ -53,6 +57,7 @@ interface Application {
     action: 'approved' | 'rejected' | 'data_added' | 'forwarded';
     remarks?: string;
     timestamp: string;
+    blockNumber?: number;
     data?: any;
   }>;
 }
@@ -137,9 +142,11 @@ export default function ApplicationDetailsPage() {
       const officialDesignation = official.designation?.toLowerCase().replace(/\s+/g, '').replace(/_/g, '') || '';
 
       const allowedRoles = statusToRoleMap[currentStatus] || [];
-      const assigned = allowedRoles.some(role =>
-        role.replace(/\s+/g, '').replace(/_/g, '') === officialDesignation
-      );
+      const assigned = allowedRoles.some(role => {
+        const normalizedRole = role.replace(/\s+/g, '').replace(/_/g, '');
+        const normalizedOfficialRole = official.designation.toLowerCase().replace(/\s+/g, '').replace(/_/g, '');
+        return normalizedOfficialRole.includes(normalizedRole) || normalizedRole.includes(normalizedOfficialRole);
+      });
 
       console.log('Assignment check:', {
         applicationStatus: currentStatus,
@@ -402,6 +409,10 @@ export default function ApplicationDetailsPage() {
               <label className="text-xs text-blue-300/70 uppercase tracking-wider">Receipt Number</label>
               <p className="text-white font-semibold mt-1 font-mono text-sm">{application.receiptNumber}</p>
             </div>
+            <div className="md:col-span-2">
+              <label className="text-xs text-blue-300/70 uppercase tracking-wider block mb-2">Decentralized Identity (DID)</label>
+              <DIDDisplay did={(application as any).did} compact={false} />
+            </div>
           </div>
         </div>
 
@@ -457,11 +468,11 @@ export default function ApplicationDetailsPage() {
           </div>
         </div>
 
-        {/* Documents */}
+        {/* Documents & Security */}
         <div className="bg-white/10 backdrop-blur-lg rounded-2xl border border-indigo-500/20 p-6 mb-6">
           <h2 className="text-xl font-bold text-indigo-300 mb-4 flex items-center gap-2">
             <FaFileAlt />
-            Documents
+            Documents & Security
           </h2>
           <div className="space-y-4">
             <div className="bg-slate-800/70 p-5 rounded-xl border border-purple-500/30">
@@ -477,6 +488,7 @@ export default function ApplicationDetailsPage() {
                 </a>
               </div>
             </div>
+
             {application.ipfsHash && (
               <div className="bg-slate-800/70 p-5 rounded-xl border border-blue-500/30">
                 <div className="flex items-center justify-between">
@@ -492,7 +504,38 @@ export default function ApplicationDetailsPage() {
                 </div>
               </div>
             )}
-            {/* DigiLocker Document Request */}
+
+            {/* M8 AI Trust Score (Persona: Collector / Joint Collector) */}
+            <AITrustScore
+              application={application}
+              isVisible={['clerk', 'mro', 'collector', 'jointcollector', 'districtcollector', 'district_collector'].some(r => official?.designation?.toLowerCase().includes(r))}
+            />
+
+            {/* M7 Blockchain Integrity Anchor (Persona: Clerk, MRO and higher) */}
+            {application.docHash && ['clerk', 'mro', 'collector', 'jointcollector', 'districtcollector', 'district_collector'].some(r => official?.designation?.toLowerCase().includes(r)) && (
+              <div className="bg-slate-800/70 p-5 rounded-xl border border-green-500/30">
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2 text-green-300">
+                    <FaShieldAlt className="text-xl" />
+                    <span className="font-bold">Blockchain Integrity Anchor (M7)</span>
+                  </div>
+                  <div className="bg-black/40 p-3 rounded-lg border border-green-500/20">
+                    <p className="text-xs text-green-200/50 uppercase tracking-widest mb-1">SHA-256 DocHash</p>
+                    <p className="text-sm text-green-400 font-mono break-all">{application.docHash}</p>
+                  </div>
+                  <p className="text-xs text-blue-200/70 mt-1 italic">
+                    * This hash is anchored to the Hyperledger Fabric ledger and verified against the DigiLocker source.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* M9 AI/OCR Analysis (Persona: Clerk, Superintendent, Project Officer, and MRO) */}
+            {(['clerk', 'superintendent', 'project_officer', 'mro', 'officer', 'revenue'].some(r => official?.designation?.toLowerCase().includes(r))) && (
+              <OCRAnalysisPanel application={application} />
+            )}
+
+            {/* DigiLocker Document Request (Visible to Processing Officers) */}
             {official?._id && (
               <DigiLockerRequestPanel
                 aadharNumber={application.aadharNumber || ''}
@@ -512,168 +555,175 @@ export default function ApplicationDetailsPage() {
         {getRoleComponent()}
 
         {/* Action Buttons */}
-        {isAssigned && (
-          <div className="bg-white/10 backdrop-blur-lg rounded-2xl border border-blue-500/20 p-6">
-            <h2 className="text-xl font-bold text-white mb-4">Take Action</h2>
-            <div className="flex gap-4">
-              <button
-                onClick={() => handleAction('forward', `Approved by ${official?.designation}`)}
-                disabled={isProcessing}
-                className={`flex-1 px-6 py-4 rounded-xl font-bold transition-all border ${isProcessing
-                  ? 'bg-gray-500/20 text-gray-300 border-gray-500/30 cursor-not-allowed opacity-50'
-                  : 'bg-linear-to-r from-green-500/20 to-emerald-500/20 hover:from-green-500/30 hover:to-emerald-500/30 text-green-200 hover:text-white border-green-500/30'
-                  }`}
-              >
-                <FaCheckCircle className="inline mr-2" />
-                {isProcessing ? 'Processing...' : (official?.designation?.toLowerCase() === 'clerk' ? 'Forward' : 'Approve & Forward')}
-              </button>
-              <button
-                onClick={() => handleAction('reject', `Rejected by ${official?.designation}`)}
-                disabled={isProcessing}
-                className={`flex-1 px-6 py-4 rounded-xl font-bold transition-all border ${isProcessing
-                  ? 'bg-gray-500/20 text-gray-300 border-gray-500/30 cursor-not-allowed opacity-50'
-                  : 'bg-linear-to-r from-red-500/20 to-rose-500/20 hover:from-red-500/30 hover:to-rose-500/30 text-red-200 hover:text-white border-red-500/30'
-                  }`}
-              >
-                <FaExclamationTriangle className="inline mr-2" />
-                {isProcessing ? 'Processing...' : 'Reject'}
-              </button>
+        {
+          isAssigned && (
+            <div className="bg-white/10 backdrop-blur-lg rounded-2xl border border-blue-500/20 p-6">
+              <h2 className="text-xl font-bold text-white mb-4">Take Action</h2>
+              <div className="flex gap-4">
+                <button
+                  onClick={() => handleAction('forward', `Approved by ${official?.designation}`)}
+                  disabled={isProcessing}
+                  className={`flex-1 px-6 py-4 rounded-xl font-bold transition-all border ${isProcessing
+                    ? 'bg-gray-500/20 text-gray-300 border-gray-500/30 cursor-not-allowed opacity-50'
+                    : 'bg-linear-to-r from-green-500/20 to-emerald-500/20 hover:from-green-500/30 hover:to-emerald-500/30 text-green-200 hover:text-white border-green-500/30'
+                    }`}
+                >
+                  <FaCheckCircle className="inline mr-2" />
+                  {isProcessing ? 'Processing...' : (official?.designation?.toLowerCase() === 'clerk' ? 'Forward' : 'Approve & Forward')}
+                </button>
+                <button
+                  onClick={() => handleAction('reject', `Rejected by ${official?.designation}`)}
+                  disabled={isProcessing}
+                  className={`flex-1 px-6 py-4 rounded-xl font-bold transition-all border ${isProcessing
+                    ? 'bg-gray-500/20 text-gray-300 border-gray-500/30 cursor-not-allowed opacity-50'
+                    : 'bg-linear-to-r from-red-500/20 to-rose-500/20 hover:from-red-500/30 hover:to-rose-500/30 text-red-200 hover:text-white border-red-500/30'
+                    }`}
+                >
+                  <FaExclamationTriangle className="inline mr-2" />
+                  {isProcessing ? 'Processing...' : 'Reject'}
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          )
+        }
 
-        {!isAssigned && (
-          <div className={`backdrop-blur-lg rounded-2xl border p-6 ${application.status === 'completed'
-            ? 'bg-green-500/10 border-green-500/30'
-            : application.status === 'rejected'
-              ? 'bg-red-500/10 border-red-500/30'
-              : 'bg-yellow-500/10 border-yellow-500/30'
-            }`}>
-            <div className="flex items-center gap-3">
-              {application.status === 'completed' ? (
-                <>
-                  <FaCheckCircle className="text-green-400 text-3xl shrink-0" />
-                  <div>
-                    <h3 className="text-xl font-bold text-green-300">✅ Application Approved</h3>
-                    <p className="text-sm text-green-200 mt-1">
-                      This application has been successfully approved and completed through all required stages.
-                    </p>
-                  </div>
-                </>
-              ) : application.status === 'rejected' ? (
-                <>
-                  <FaExclamationTriangle className="text-red-400 text-3xl shrink-0" />
-                  <div>
-                    <h3 className="text-xl font-bold text-red-300">❌ Application Rejected</h3>
-                    <p className="text-sm text-red-200 mt-1">
-                      This application has been rejected. Please check the application history for rejection details and reasons.
-                    </p>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <FaClock className="text-yellow-400 text-3xl shrink-0" />
-                  <div>
-                    <h3 className="text-xl font-bold text-yellow-300">ℹ️ Application In Progress</h3>
-                    <p className="text-sm text-yellow-200 mt-1">
-                      This application is not currently assigned to you. You can view the details but cannot take action.
-                    </p>
-                  </div>
-                </>
-              )}
+        {
+          !isAssigned && (
+            <div className={`backdrop-blur-lg rounded-2xl border p-6 ${application?.status === 'completed'
+              ? 'bg-green-500/10 border-green-500/30'
+              : application?.status === 'rejected'
+                ? 'bg-red-500/10 border-red-500/30'
+                : 'bg-yellow-500/10 border-yellow-500/30'
+              }`}>
+              <div className="flex items-center gap-3">
+                {application?.status === 'completed' ? (
+                  <>
+                    <FaCheckCircle className="text-green-400 text-3xl shrink-0" />
+                    <div>
+                      <h3 className="text-xl font-bold text-green-300">✅ Application Approved</h3>
+                      <p className="text-sm text-green-200 mt-1">
+                        This application has been successfully approved and completed through all required stages.
+                      </p>
+                    </div>
+                  </>
+                ) : application.status === 'rejected' ? (
+                  <>
+                    <FaExclamationTriangle className="text-red-400 text-3xl shrink-0" />
+                    <div>
+                      <h3 className="text-xl font-bold text-red-300">❌ Application Rejected</h3>
+                      <p className="text-sm text-red-200 mt-1">
+                        This application has been rejected. Please check the application history for rejection details and reasons.
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <FaClock className="text-yellow-400 text-3xl shrink-0" />
+                    <div>
+                      <h3 className="text-xl font-bold text-yellow-300">ℹ️ Application In Progress</h3>
+                      <p className="text-sm text-yellow-200 mt-1">
+                        This application is not currently assigned to you. You can view the details but cannot take action.
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )
+        }
 
         {/* Unsaved Data Warning Modal */}
-        {showDataWarning && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-slate-900 rounded-2xl border border-yellow-500/30 p-8 max-w-md w-full">
-              <div className="flex items-start gap-3 mb-4">
-                <FaExclamationTriangle className="text-yellow-400 text-2xl shrink-0 mt-1" />
-                <div>
-                  <h3 className="text-xl font-bold text-yellow-300">Unsaved Data Detected</h3>
-                  <p className="text-sm text-yellow-200 mt-1">
-                    There may be data that hasn't been auto-saved yet. Please wait a moment or click the save button to ensure all data is saved before proceeding with your action.
+        {
+          showDataWarning && (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+              <div className="bg-slate-900 rounded-2xl border border-yellow-500/30 p-8 max-w-md w-full">
+                <div className="flex items-start gap-3 mb-4">
+                  <FaExclamationTriangle className="text-yellow-400 text-2xl shrink-0 mt-1" />
+                  <div>
+                    <h3 className="text-xl font-bold text-yellow-300">Unsaved Data Detected</h3>
+                    <p className="text-sm text-yellow-200 mt-1">
+                      There may be data that hasn't been auto-saved yet. Please wait a moment or click the save button to ensure all data is saved before proceeding with your action.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 mb-6">
+                  <p className="text-sm text-yellow-100">
+                    <strong>⏳ Auto-save is running...</strong> Data will be saved automatically as you make changes.
                   </p>
                 </div>
-              </div>
 
-              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 mb-6">
-                <p className="text-sm text-yellow-100">
-                  <strong>⏳ Auto-save is running...</strong> Data will be saved automatically as you make changes.
-                </p>
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    setShowDataWarning(false);
-                    setPendingAction(null);
-                  }}
-                  className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold transition-all"
-                >
-                  Go Back
-                </button>
-                <button
-                  onClick={() => {
-                    setShowDataWarning(false);
-                    if (pendingAction) {
-                      // Wait for auto-save to complete (2 seconds)
-                      setTimeout(() => {
-                        proceedWithAction(pendingAction.action, pendingAction.remarks);
-                      }, 2500);
-                    }
-                  }}
-                  className="flex-1 px-4 py-2 bg-green-500/20 hover:bg-green-500/30 text-green-200 border border-green-500/30 rounded-lg font-semibold transition-all"
-                >
-                  Wait & Proceed
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setShowDataWarning(false);
+                      setPendingAction(null);
+                    }}
+                    className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold transition-all"
+                  >
+                    Go Back
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowDataWarning(false);
+                      if (pendingAction) {
+                        // Wait for auto-save to complete (2 seconds)
+                        setTimeout(() => {
+                          proceedWithAction(pendingAction.action, pendingAction.remarks);
+                        }, 2500);
+                      }
+                    }}
+                    className="flex-1 px-4 py-2 bg-green-500/20 hover:bg-green-500/30 text-green-200 border border-green-500/30 rounded-lg font-semibold transition-all"
+                  >
+                    Wait & Proceed
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )
+        }
 
         {/* Loading Indicator Modal */}
-        {isProcessing && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-            <div className="flex flex-col items-center gap-6">
-              {/* Animated Spinner */}
-              <div className="relative w-20 h-20">
-                {/* Outer rotating ring */}
-                <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-green-400 border-r-green-400 animate-spin"
-                  style={{
-                    animation: 'spin 2s linear infinite'
-                  }}
-                />
-                {/* Middle rotating ring (opposite direction) */}
-                <div className="absolute inset-2 rounded-full border-4 border-transparent border-b-blue-400 border-l-blue-400 animate-spin"
-                  style={{
-                    animation: 'spin 3s linear infinite reverse'
-                  }}
-                />
-                {/* Center dot */}
-                <div className="absolute inset-0 rounded-full flex items-center justify-center">
-                  <div className="w-3 h-3 bg-linear-to-br from-green-400 to-blue-400 rounded-full animate-pulse" />
+        {
+          isProcessing && (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+              <div className="flex flex-col items-center gap-6">
+                {/* Animated Spinner */}
+                <div className="relative w-20 h-20">
+                  {/* Outer rotating ring */}
+                  <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-green-400 border-r-green-400 animate-spin"
+                    style={{
+                      animation: 'spin 2s linear infinite'
+                    }}
+                  />
+                  {/* Middle rotating ring (opposite direction) */}
+                  <div className="absolute inset-2 rounded-full border-4 border-transparent border-b-blue-400 border-l-blue-400 animate-spin"
+                    style={{
+                      animation: 'spin 3s linear infinite reverse'
+                    }}
+                  />
+                  {/* Center dot */}
+                  <div className="absolute inset-0 rounded-full flex items-center justify-center">
+                    <div className="w-3 h-3 bg-linear-to-br from-green-400 to-blue-400 rounded-full animate-pulse" />
+                  </div>
+                </div>
+
+                {/* Text */}
+                <div className="text-center">
+                  <h3 className="text-xl font-bold text-white mb-2">Processing</h3>
+                  <p className="text-sm text-gray-300">Uploading documents and processing your action...</p>
+                </div>
+
+                {/* Progress dots */}
+                <div className="flex gap-2">
+                  <div className="w-2 h-2 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
+                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                  <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
                 </div>
               </div>
 
-              {/* Text */}
-              <div className="text-center">
-                <h3 className="text-xl font-bold text-white mb-2">Processing</h3>
-                <p className="text-sm text-gray-300">Uploading documents and processing your action...</p>
-              </div>
-
-              {/* Progress dots */}
-              <div className="flex gap-2">
-                <div className="w-2 h-2 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
-                <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
-                <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
-              </div>
-            </div>
-
-            {/* CSS for custom animations */}
-            <style>{`
+              {/* CSS for custom animations */}
+              <style>{`
               @keyframes spin {
                 from {
                   transform: rotate(0deg);
@@ -683,10 +733,11 @@ export default function ApplicationDetailsPage() {
                 }
               }
             `}</style>
-          </div>
-        )}
-      </div>
-    </div>
+            </div>
+          )
+        }
+      </div >
+    </div >
   );
 }
 

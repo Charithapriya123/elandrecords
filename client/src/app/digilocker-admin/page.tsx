@@ -44,20 +44,7 @@ export default function DigiLockerAdmin() {
         reader.readAsDataURL(file);
       });
 
-      // Upload to IPFS
-      const ipfsRes = await fetch('/api/ipfs/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file: base64, fileName: file.name })
-      });
-      const ipfsData = await ipfsRes.json();
-
-      if (!ipfsData.ipfsHash) {
-        setError('Failed to upload to IPFS');
-        return;
-      }
-
-      // Save to DigiLocker vault
+      // Save to DigiLocker vault (no IPFS yet - uploaded only when citizen approves)
       const vaultRes = await fetch('/api/digilocker-vault', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -66,7 +53,7 @@ export default function DigiLockerAdmin() {
           citizenName,
           citizenEmail,
           documentType,
-          ipfsHash: ipfsData.ipfsHash,
+          fileData: base64,
           fileName: file.name,
           uploadedBy: 'government_authority'
         })
@@ -74,7 +61,7 @@ export default function DigiLockerAdmin() {
       const vaultData = await vaultRes.json();
 
       if (vaultData.success) {
-        setMessage(`✅ Document uploaded successfully! IPFS Hash: ${ipfsData.ipfsHash}`);
+        setMessage('✅ Document saved to DigiLocker vault! Will be uploaded to IPFS when citizen approves official request.');
         setFile(null);
         searchCitizen();
       } else {
@@ -179,15 +166,18 @@ export default function DigiLockerAdmin() {
                   </div>
                   <div style={{ fontSize: '12px', color: '#94a3b8' }}>File: {doc.fileName}</div>
                   <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px', wordBreak: 'break-all' }}>
-                    IPFS: <span style={{ color: '#38bdf8' }}>{doc.ipfsHash}</span>
+                    {doc.ipfsHash && <span>IPFS: <span style={{ color: '#38bdf8' }}>{doc.ipfsHash}</span></span>}
                   </div>
                   <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
                     Uploaded: {new Date(doc.verifiedAt).toLocaleString('en-IN')}
                   </div>
+                  {doc.ipfsHash && (
                   <a href={`https://gateway.pinata.cloud/ipfs/${doc.ipfsHash}`} target="_blank"
                     style={{ display: 'inline-block', marginTop: '8px', fontSize: '12px', color: '#38bdf8', textDecoration: 'none' }}>
                     🔗 View on IPFS →
                   </a>
+                )}
+
                 </div>
               ))
             )}

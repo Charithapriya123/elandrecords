@@ -69,8 +69,8 @@ export default function CitizenDigiLocker() {
       });
       const data = await res.json();
       setActionMsg(action === 'approved' ? '✅ Access granted to official!' : '❌ Request rejected.');
-      setTimeout(() => setActionMsg(''), 3000);
-      fetchAll();
+      setRequests(prev => prev.filter(r => r._id !== requestId));
+      setTimeout(() => setActionMsg(''), 4000);
     } catch {
       setActionMsg('Failed to respond');
     }
